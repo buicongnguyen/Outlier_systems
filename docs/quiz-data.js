@@ -159,6 +159,39 @@ const quizData = {
         "Later, a checkpoint writes the dirty data pages in place"
       ],
       explain: "The order is the whole durability story: the new version and its log record exist in memory first, the sequential WAL flush at commit is what makes it crash-proof, the client hears success only after that fsync, and the random-I/O page writes happen lazily at checkpoint time — recovery replays the WAL if a crash lands in between."
+    },
+    {
+      level: "senior",
+      q: "A write-heavy Postgres service shows p99 latency cliffs every few minutes: normally 5ms, spiking to 400ms in bursts, with disk write throughput saturating during each spike. CPU and query plans are fine. What is the most likely mechanism and the right lever?",
+      options: [
+        ["Checkpoints: accumulated dirty pages are flushed in a burst, and full-page writes inflate WAL right after each checkpoint — spread the flush (checkpoint_completion_target, more WAL/longer checkpoint spacing) instead of tuning queries", true],
+        ["The B-tree indexes are fragmenting; REINDEX nightly", false],
+        ["Autovacuum is deleting too many dead tuples; disable it during peak hours", false],
+        ["Connection pool exhaustion; double max_connections", false]
+      ],
+      explain: "Periodic latency cliffs synchronized with a burst of disk writes are the checkpoint signature: the engine reconciles the WAL with data pages, dumping dirty pages at once, while post-checkpoint full-page writes multiply WAL volume. The fix is spreading that I/O over the whole interval and giving checkpoints more room — not query tuning, which was never the bottleneck. Disabling autovacuum trades a spike for slow poison (bloat), and the profile doesn't point at connections at all. Principal-level diagnosis means matching the periodicity and I/O shape to the engine's background machinery."
+    },
+    {
+      level: "senior",
+      q: "A flash sale decrements the stock counter of one hot product. Under load, throughput collapses: thousands of transactions serialize on that single row, each holding its lock through commit. A proposal suggests a 4x larger database instance. What is the principal-level read?",
+      options: [
+        ["Hardware won't fix a serialization point — one row's lock is held for a full commit each time regardless of CPU; restructure the contention away: split the count into N sub-counters summed on read, or funnel decrements through a queue/batcher that applies them in bulk", true],
+        ["Approve it — more CPU processes the queue of waiting transactions faster", false],
+        ["Switch the whole catalog to an eventually-consistent store, since ACID cannot handle this", false],
+        ["Lower the isolation level to READ UNCOMMITTED so transactions stop blocking", false]
+      ],
+      explain: "Row-lock hold time ≈ lock-to-commit latency, so max throughput on one row ≈ 1/hold-time — a bigger box barely moves it (Amdahl's law applied to a lock convoy). The design-level fixes attack the single point: sharded sub-counters, batched application of decrements, or reservation patterns. Dropping isolation doesn't remove write locks and invites overselling; abandoning ACID wholesale trades a solvable hot-spot for a correctness rewrite. Recognizing 'this is a contention structure problem, not a capacity problem' is the judgment being tested."
+    },
+    {
+      level: "senior",
+      q: "You're sharding a multi-tenant SaaS database by hash(tenant_id). Analysis shows the largest tenant generates 40% of all traffic and is still growing. What does a principal engineer conclude?",
+      options: [
+        ["No choice of hash key fixes skew this extreme — one shard will always hold the whale; plan tenant-level placement instead: isolate the big tenant on dedicated hardware, and consider sub-partitioning within that tenant (e.g., by entity) for headroom", true],
+        ["Use a better hash function so the large tenant's load spreads evenly", false],
+        ["Shard by row ID instead, ignoring tenant boundaries entirely", false],
+        ["Add more shards until the large tenant's share per shard is acceptable", false]
+      ],
+      explain: "Hashing distributes keys, not the load within one key: tenant_id routes the whole whale to one shard no matter the function, and adding shards just shrinks everyone else's slice. Sharding by row ID spreads the load but destroys tenant locality — every query fans out to all shards and per-tenant isolation/compliance gets harder. Real systems handle whales with placement policy (dedicated shards, resource isolation) plus a second-level partition key inside the tenant. The lesson: partition-key design is workload analysis, and heavy-hitter skew is a first-class constraint, not an afterthought."
     }
   ],
   os: [
@@ -317,6 +350,39 @@ const quizData = {
         "The kernel maps the loaded page and the faulting thread resumes at the same instruction"
       ],
       explain: "This is the major-fault path: translation fails, the trap hands control to the kernel, disk I/O forces a block-and-switch, and afterwards the instruction restarts as if nothing happened. The invisible restart is why paging is transparent — and the milliseconds of disk time are why major faults in a hot path destroy performance."
+    },
+    {
+      level: "senior",
+      q: "A containerized service shows p99 spikes of exactly ~100ms-multiples while average CPU sits at 30% of its 1-CPU limit. The node has idle cores. cgroup stats show heavy nr_throttled counts. What is happening?",
+      options: [
+        ["CFS quota throttling: the multi-threaded runtime burns the entire 100ms-period quota in a short parallel burst, then ALL threads sit frozen until the next period — average CPU stays low while tail latency absorbs the stalls; raise/remove the CPU limit or align runtime thread counts with the quota", true],
+        ["The kernel scheduler is deprioritizing the container because of low nice value", false],
+        ["Memory pressure is forcing the container into swap every 100ms", false],
+        ["The node's cores are oversubscribed, so the container waits for a free CPU", false]
+      ],
+      explain: "CPU limits are enforced as a quota per 100ms period: a service with 8 runtime threads and a 1-CPU limit can spend its entire 100ms budget in ~12ms of parallel work, then everything stops until the period resets — hence latency quantized in period multiples with low average utilization and idle host cores. The fix is judgment: drop CPU limits (keep requests), or tell the runtime (GOMAXPROCS, thread pools) how much CPU it truly has. Recognizing throttling from the '100ms-shaped tail + low average' signature — where naive dashboards say 'CPU is fine' — is a classic principal-level diagnosis bridging OS and orchestration."
+    },
+    {
+      level: "senior",
+      q: "Profiling a hot service shows 35% of time in futex syscalls around one mutex protecting a large in-memory map. An engineer proposes rewriting the map as a lock-free structure. What should a principal engineer do first?",
+      options: [
+        ["Attack the contention before the lock: shrink the critical section (compute outside, copy in), shard the map into N stripes each with its own mutex, or use read-mostly structures (RCU/read-write locks/snapshots) — a lock-free rewrite is a last resort with high correctness risk and often no better throughput under real contention", true],
+        ["Approve the lock-free rewrite — lock-free is faster by definition", false],
+        ["Replace the mutex with a spinlock so threads stop entering the kernel", false],
+        ["Raise the thread count so more threads make progress while others wait", false]
+      ],
+      explain: "Heavy futex time means threads are sleeping on contention; the cure is less sharing, not cleverer sharing. Striping typically delivers a near-linear win for a day of work, while lock-free code trades that for ABA hazards, memory-reclamation puzzles, and still ping-pongs the same cache lines — contention lives in the coherence protocol, not the syscall. Spinlocks convert sleep time into burned CPU (worse under load), and more threads add contenders to a fixed bottleneck. The principal instinct: change the sharing structure, measure, and only then consider exotic tools."
+    },
+    {
+      level: "senior",
+      q: "A Node.js API shows a puzzling pattern: every few minutes, ALL endpoints — including trivial health checks — stall together for ~2 seconds, then recover simultaneously. CPU is modest, the database is healthy. Where do you look?",
+      options: [
+        ["At the event loop itself: unrelated endpoints freezing in unison means the single loop thread is blocked — hunt for synchronous work on it (sync file/crypto/zlib calls, a huge JSON.parse, an O(n²) handler on a big payload) using event-loop-lag metrics and blocked-at profilers, then move the work off-loop", true],
+        ["At the database connection pool — it must be running out of connections", false],
+        ["At the network — packet loss between the load balancer and the service", false],
+        ["At the OS scheduler — the process needs a higher priority", false]
+      ],
+      explain: "The tell is correlation: a pool or network problem would hit endpoints that use those resources, but a health check that touches nothing stalls only if the shared loop thread itself is busy. A 2-second synchronous computation (or GC pause in other runtimes) freezes every queued callback, then everything drains at once — exactly the observed shape. Event-loop lag is the metric that would have paged you. The transferable skill: 'everything stalls together' points at the shared execution resource, not at any individual dependency."
     }
   ],
   dist: [
@@ -475,6 +541,39 @@ const quizData = {
         "The new leader sends heartbeats/AppendEntries, and any stale ex-leader that returns steps down on seeing the higher term"
       ],
       explain: "Timeout → candidacy → votes → majority → heartbeats is the full cycle; randomized timeouts make split votes rare, the up-to-date-log rule protects committed entries, and term numbers fence off a returning zombie leader."
+    },
+    {
+      level: "senior",
+      q: "A team guards a billing job with a Redis lock (SET NX with 30s TTL) so it runs 'exactly once' per hour. A review flags it. What is the real problem, and the principal-level fix?",
+      options: [
+        ["The lock guarantees liveness, not safety: a GC pause or network stall past the TTL leaves the old holder running while a new one starts — two workers billing concurrently; make the job idempotent (dedupe on a billing-period key at the data layer) or enforce fencing tokens at the resource, and keep the lock only as an optimization", true],
+        ["The TTL is too short — raise it to 10 minutes and the problem disappears", false],
+        ["Redis is single-threaded, so the lock cannot be acquired concurrently and the design is already safe", false],
+        ["Use two Redis instances and require the lock from both", false]
+      ],
+      explain: "Any lease-based lock has the same hole: the holder cannot atomically check 'do I still hold it?' and act — a pause between check and write makes a zombie. Raising the TTL just lengthens downtime after crashes while narrowing (never closing) the race, and quorum variants (Redlock) still fall to the same pause argument (Kleppmann's critique). Safety must live where the effect lands: an idempotent write keyed by billing period, or storage that rejects stale fencing tokens. The principal habit: distributed locks may optimize away duplicate work, but correctness must never depend on them."
+    },
+    {
+      level: "senior",
+      q: "Postmortem: a dependency browned out for 90 seconds, but your platform was down for 40 minutes. Investigation finds the client library retries 3x, the API gateway retries 3x, and the service mesh retries 3x. What is the systemic lesson?",
+      options: [
+        ["Retries multiply across layers: 3×3×3 = up to 27 requests per user action turned a brief brownout into a self-sustaining overload; retry at ONE well-chosen layer, cap the rest at zero, add retry budgets (e.g., retries ≤ 10% of traffic) and deadline propagation so work is abandoned when the caller has already given up", true],
+        ["The dependency needs a stricter SLA so brownouts don't happen", false],
+        ["Each layer should retry more times so requests eventually succeed", false],
+        ["Timeouts should be removed so requests queue instead of failing", false]
+      ],
+      explain: "Each layer saw 'transient failure, retry' as locally reasonable; composed, they became a 27x amplifier that kept the dependency pinned long after its original problem passed — the metastable failure pattern behind many famous outages. The architectural rule: retry policy is a system-wide budget, not a per-component courtesy. One layer (usually closest to the caller's intent) owns retries; deadlines propagate so a request whose end user has timed out isn't lovingly retried three layers deep. Demanding a perfect dependency misses that the amplification was self-inflicted."
+    },
+    {
+      level: "senior",
+      q: "Product wants checkout — spanning the order, payment, and inventory services — to be 'all or nothing.' Engineers debate 2PC vs sagas. What question should a principal engineer ask first?",
+      options: [
+        ["Whether the boundary is right at all: if the invariant is truly atomic, the cleanest fix is often moving those tables into one database where a local transaction handles it; only if the boundary must stand do you weigh a saga (compensations, visible intermediate states) — 2PC across services couples availability and is usually last", true],
+        ["Which 2PC library has the best benchmarks", false],
+        ["Whether the message broker supports exactly-once delivery, which would make the problem disappear", false],
+        ["Whether to lower the databases' isolation levels so cross-service transactions run faster", false]
+      ],
+      explain: "The expensive mistake is accepting the problem as stated: 'we need a distributed transaction' often means 'a service boundary cut through an invariant.' Redrawing the boundary turns a distributed-systems problem into a SQL BEGIN/COMMIT. When the boundary is genuinely fixed (org, scale, vendor), sagas with compensations and explicit pending states are the workable pattern, with the business accepting 'paid then refunded' windows. Broker delivery guarantees don't create cross-service atomicity, and 2PC's blocking failure mode is precisely why it rarely crosses service boundaries. Architecture first, mechanism second."
     }
   ],
   net: [
@@ -633,6 +732,39 @@ const quizData = {
         "The recursive resolver caches the record for the TTL and returns the address to the client"
       ],
       explain: "Root → TLD → authoritative is the delegation walk, done by the recursive resolver on the client's behalf; caching at every layer (browser, OS, resolver) means the full walk is rare — and the TTL set at the authoritative server controls how long everyone else may keep answering from cache."
+    },
+    {
+      level: "senior",
+      q: "After moving a backend service to another region (RTT 3ms → 70ms), a page that felt instant now takes 4+ seconds — despite a 10Gbps link with almost no utilization. The team proposes buying more bandwidth. What is the principal-level analysis?",
+      options: [
+        ["Latency, not bandwidth, is the bottleneck: the page makes ~50 sequential API calls, and 50 × 70ms is 3.5s of pure speed-of-light tax; the fixes are round-trip arithmetic — batch calls, parallelize independent ones, move chatty call chains back alongside their data, or cache at the edge — more bandwidth changes nothing", true],
+        ["Buy the bandwidth — 10Gbps is clearly saturating on page loads", false],
+        ["Switch the API from JSON to a binary encoding to shrink payloads", false],
+        ["Upgrade to HTTP/3 — QUIC eliminates the added RTT", false]
+      ],
+      explain: "A near-idle 10Gbps pipe cannot be the constraint; sequential round trips are. This is the classic chatty-interface failure: N+1 API calls were invisible at 3ms and ruinous at 70ms. Payload encoding shaves bytes off transfers that were already tiny, and HTTP/3 removes a handshake round trip or two — not the 50 application-level turns. The durable lesson: latency budgets are counted in round trips × RTT, so interfaces that cross regions must be designed coarse-grained. 'Did the number of sequential turns change?' is the first question when distance enters an architecture."
+    },
+    {
+      level: "senior",
+      q: "Users behind certain corporate networks report HTTPS requests to your API that hang exactly on large responses; small responses work, and packet captures show the TLS handshake completing fine. What is the classic diagnosis?",
+      options: [
+        ["A path MTU discovery black hole: your server sends full-size packets with DF set, a link in the path has a smaller MTU, and its 'fragmentation needed' ICMP replies are firewalled — big packets silently vanish; fix by clamping MSS (or lowering MTU) so packets fit the narrowest link", true],
+        ["The corporate proxy is rate-limiting responses above a size threshold", false],
+        ["TCP slow start makes large responses too slow for the corporate firewall's timeout", false],
+        ["The TLS record size exceeds the certificate's key length", false]
+      ],
+      explain: "Small-works/large-hangs with a healthy handshake is the PMTUD-black-hole signature: handshake packets are small and squeeze through; the first full-size data segment exceeds some tunnel's MTU (VPNs and PPPoE shave bytes), and the router's ICMP 'too big' message — the signal PMTUD depends on — is dropped by an over-zealous firewall. The sender retransmits the same oversized packet forever. MSS clamping at your edge sidesteps the broken feedback loop. Grey failures like this reward knowing what each layer needs to function — here, that 'reliable' TCP quietly depends on ICMP."
+    },
+    {
+      level: "senior",
+      q: "A service behind a load balancer throws rare, random 502s — worse at LOW traffic. Backend logs show nothing wrong. The LB's idle keep-alive timeout is 75s; the backend server closes idle connections at 60s. Explain the bug.",
+      options: [
+        ["A close race on reused connections: the backend closes an idle connection at 60s, but the LB still considers it usable until 75s and may send a request into the closing connection — the request dies as a 502; fix by making the backend's idle timeout LONGER than the LB's so only the LB initiates idle closes", true],
+        ["The backend is overloaded — add replicas until the 502s stop", false],
+        ["The LB health checks are too aggressive and mark healthy backends down", false],
+        ["TLS tickets expire at 60s, forcing failed resumptions", false]
+      ],
+      explain: "Between the backend's FIN and the LB noticing, there's a window where the LB fires a request into a dying connection — and idle windows that long only occur at low traffic, explaining the inverted correlation. The rule that generalizes across every proxy chain (CDN → LB → sidecar → app): each hop's idle timeout must exceed its downstream caller's, so the entity that owns connection reuse is always the one that closes. Nothing is 'failing,' which is why backend logs are clean; the bug lives in the interaction of two individually-correct configurations — precisely where principal-level networking problems hide."
     }
   ],
   infra: [
@@ -791,6 +923,39 @@ const quizData = {
         "Ramp to 100%, keeping rollback one action away"
       ],
       explain: "Each gate catches what the previous one can't: tests catch logic bugs, staging catches integration and config drift, the canary catches what only real production traffic reveals, and the ramp bounds the damage of anything that slipped through. The artifact is built once and promoted unchanged — never rebuilt per environment."
+    },
+    {
+      level: "senior",
+      q: "A team of 6 engineers proposes decomposing their monolith into ~30 microservices with Kubernetes, a service mesh, and Kafka, citing 'scalability.' The monolith serves 200 req/s at 30% CPU. What is the principal-level response?",
+      options: [
+        ["Challenge the premise: microservices solve organizational scaling (many teams shipping independently) at the price of distributed-systems problems — network failure modes, eventual consistency, 30 deploy pipelines, on-call for a fleet; at this team size and load, enforce module boundaries inside the monolith and extract a service only when a specific, felt pain justifies each cut", true],
+        ["Approve it — microservices are the modern architecture and the migration must happen eventually", false],
+        ["Approve it but require gRPC everywhere so the network overhead is negligible", false],
+        ["Reject Kubernetes specifically; 30 microservices on VMs would be fine", false]
+      ],
+      explain: "The load numbers show no technical scaling problem, and 6 engineers cannot amortize 30 services' operational surface — every cross-service call adds a failure mode that a function call didn't have, and every 'simple' change now spans repos, contracts, and deploys. Modular monolith first (clean interfaces, separate schemas) preserves the option to extract later along proven seams. The judgment being tested: architecture proposals are evaluated against the actual constraint (org size, load, failure tolerance), and complexity is a cost you buy only when its specific benefit is needed. Distinguished-engineer consensus (Fowler's 'monolith first') agrees."
+    },
+    {
+      level: "senior",
+      q: "An outage postmortem: a bad config value was pushed globally through the config service in seconds, crashing every instance at once — while code deploys go through a careful multi-hour canary. What is the systemic fix?",
+      options: [
+        ["Treat every behavior-changing input as a deploy: config, feature flags, and data files get the same progressive rollout — staged percentage, health-gated auto-halt, and one-action rollback — because the blast radius of a change is set by its rollout mechanism, not by whether it 'is code'", true],
+        ["Require a second engineer to eyeball every config change before push", false],
+        ["Freeze all config changes except during business hours", false],
+        ["Move all configuration into the binary so it ships through the code pipeline — config services are inherently unsafe", false]
+      ],
+      explain: "The postmortem pattern behind several famous outages (Cloudflare's regex, Google's quota pushes): the org built rigorous defenses on one change path while an equally powerful path ran with none. Human review catches typos, not emergent behavior under production traffic — the same reason canaries exist for code. The durable principle is uniform treatment of change risk: anything that alters runtime behavior rides a gradual, observable, reversible rollout. Baking config into binaries just makes changes slower without making them safer; the config service isn't the flaw — its instant global fanout is."
+    },
+    {
+      level: "senior",
+      q: "During an incident, latency tripled while the HPA did nothing: it scales on CPU, which sat at 40%. The pods were actually saturated waiting on a slow downstream dependency, each holding hundreds of in-flight requests. What is the architectural lesson?",
+      options: [
+        ["Autoscale on the signal that actually saturates: for I/O-bound services that's concurrency (in-flight requests), queue depth, or latency against SLO — CPU-based scaling is blind to I/O-bound saturation, and scaling out on it here would have just multiplied connections hammering the struggling dependency; pair correct signals with per-pod concurrency limits and load shedding", true],
+        ["Lower the CPU target to 20% so the HPA reacts to smaller changes", false],
+        ["Remove the HPA and always run maximum replicas", false],
+        ["Autoscaling was correct to do nothing, since the pods weren't out of CPU", false]
+      ],
+      explain: "The HPA behaved exactly as configured and exactly wrongly: the saturated resource was concurrency slots, not CPU, so its input carried no information about the bottleneck. Worse, blindly adding replicas during a downstream brownout amplifies the pressure — sometimes the right response is shedding load, not scaling. Tuning the wrong signal harder (20% target) buys noise, and max-replicas-always abandons elasticity instead of fixing observability. The principal-level takeaway spans systems: control loops are only as good as the signal they observe, and capacity decisions must model where the queue actually forms."
     }
   ]
 };

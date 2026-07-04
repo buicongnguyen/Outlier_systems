@@ -39,6 +39,7 @@
     .check-btn:hover:enabled { background:var(--accent-strong); border-color:var(--accent-strong); }
     .check-btn:disabled { opacity:0.5; cursor:default; }
     .qtype-tag { display:inline-block; margin-left:8px; padding:2px 9px; border-radius:999px; background:var(--warn-soft); color:var(--warn); font-size:11px; font-weight:700; vertical-align:2px; white-space:nowrap; }
+    .level-tag { display:inline-block; margin-left:8px; padding:2px 9px; border-radius:999px; background:var(--accent-soft); color:var(--accent-strong); border:1px solid var(--accent); font-size:11px; font-weight:700; vertical-align:2px; white-space:nowrap; }
     .explain { display:none; margin:10px 0 0; padding:10px 12px; border-left:3px solid var(--accent); background:var(--accent-soft); border-radius:0 6px 6px 0; color:var(--text); }
     .explain.show { display:block; }
     .show-all .explain { display:block; }
@@ -80,7 +81,9 @@
         systems, networking, and infrastructure. Each section has a definitions list, core-concept cards
         with tradeoffs and pitfalls, ASCII diagrams where a picture helps, further-reading links, and a
         bank of practice questions with explanations in three formats: single-answer, select-all-that-apply,
-        and ordering chains. Difficulty runs from recall up to applied reasoning.
+        and ordering chains. Difficulty runs from recall up to applied reasoning; questions tagged
+        <em>senior+</em> target senior/principal-level judgment — production diagnosis from ambiguous
+        symptoms, architecture tradeoffs under real constraints, and postmortem reasoning.
       </p>
     </section>
 
@@ -730,7 +733,9 @@ function renderQuestion(container, item, number, sectionKey) {
   if (item.type === "multi") return renderMulti(container, item, number, sectionKey);
   if (item.type === "order") return renderOrder(container, item, number, sectionKey);
   const card = el("article", "quiz-card");
-  card.appendChild(el("p", "q", `Q${number}. ${item.q}`));
+  const title = el("p", "q", `Q${number}. ${item.q}`);
+  if (item.level) title.appendChild(el("span", "level-tag", "senior+"));
+  card.appendChild(title);
   const optionsBox = el("div", "options");
   const explain = el("div", "explain");
   explain.appendChild(document.createTextNode(item.explain));
@@ -766,6 +771,7 @@ function renderMulti(container, item, number, sectionKey) {
   const card = el("article", "quiz-card");
   const title = el("p", "q", `Q${number}. ${item.q}`);
   title.appendChild(el("span", "qtype-tag", "select ALL that apply"));
+  if (item.level) title.appendChild(el("span", "level-tag", "senior+"));
   card.appendChild(title);
   const optionsBox = el("div", "options");
   const explain = el("div", "explain");
@@ -813,6 +819,7 @@ function renderOrder(container, item, number, sectionKey) {
   const card = el("article", "quiz-card");
   const title = el("p", "q", `Q${number}. ${item.q}`);
   title.appendChild(el("span", "qtype-tag", "click the steps in order"));
+  if (item.level) title.appendChild(el("span", "level-tag", "senior+"));
   card.appendChild(title);
   const optionsBox = el("div", "options");
   const explain = el("div", "explain");
