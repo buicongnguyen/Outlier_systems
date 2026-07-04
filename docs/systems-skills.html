@@ -1,0 +1,899 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Revision notes and practice questions for databases and storage, OS/concurrency/runtime, distributed systems, networking, and infrastructure.">
+  <title>Systems Skills Revision and Question Practice</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    .sub { margin-top: 24px; }
+    .term-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:12px; }
+    .term-card { background:var(--panel); border:1px solid var(--line); border-radius:8px; box-shadow:var(--shadow); padding:14px; }
+    .term-card h3 { margin-bottom:6px; color:var(--accent-strong); }
+    .term-card p { color:var(--muted); margin-bottom:0; }
+    .def-list { display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:0 22px; margin:0; padding:8px 18px; background:var(--panel); border:1px solid var(--line); border-radius:8px; box-shadow:var(--shadow); }
+    .def-list > div { padding:9px 0; border-bottom:1px solid var(--line); }
+    .def-list dt { font-weight:700; color:var(--accent-strong); }
+    .def-list dd { margin:2px 0 0; color:var(--muted); }
+    .diagram { margin:14px 0 0; padding:14px 16px; overflow-x:auto; background:var(--panel); border:1px solid var(--line); border-radius:8px; font-family:Consolas,Menlo,monospace; font-size:13px; line-height:1.45; color:var(--text); }
+    .diagram-title { margin:16px 0 0; font-size:13px; font-weight:700; color:var(--accent-strong); text-transform:uppercase; }
+    .score-bar { position:sticky; top:0; z-index:5; display:flex; flex-wrap:wrap; align-items:center; gap:12px; margin:18px 0; padding:12px 15px; background:var(--panel); border:1px solid var(--line); border-radius:8px; box-shadow:var(--shadow); }
+    .score-bar strong { font-size:17px; }
+    .score-bar .section-note { margin:0; flex:1 1 260px; }
+    .score-bar .bar-buttons { display:flex; gap:8px; margin-left:auto; }
+    .sec-score { display:inline-flex; align-items:center; min-height:30px; margin:14px 0 0; padding:4px 12px; border:1px solid var(--accent); border-radius:999px; background:var(--accent-soft); color:var(--accent-strong); font-size:13px; font-weight:700; }
+    .quiz { margin-top:12px; }
+    .quiz-card { margin:10px 0; padding:14px 15px; background:var(--panel); border:1px solid var(--line); border-radius:8px; box-shadow:var(--shadow); }
+    .quiz-card p.q { margin-bottom:10px; font-weight:700; }
+    .options { display:grid; gap:8px; }
+    .options button { min-height:40px; padding:8px 12px; border:1px solid var(--line); border-radius:6px; background:var(--bg); color:var(--text); font-size:15px; text-align:left; cursor:pointer; }
+    .options button:hover:enabled { border-color:var(--accent); background:var(--accent-soft); }
+    .options button:disabled { cursor:default; opacity:0.85; }
+    .options button.correct { border-color:var(--accent-strong); background:var(--accent-soft); color:var(--accent-strong); font-weight:700; opacity:1; }
+    .options button.incorrect { border-color:var(--warn); background:var(--warn-soft); color:var(--warn); font-weight:700; opacity:1; }
+    .options button.selected { border-color:var(--accent); background:var(--accent-soft); }
+    .options button .step-badge { display:inline-flex; align-items:center; justify-content:center; min-width:22px; height:22px; margin-right:9px; border-radius:999px; background:var(--accent); color:#ffffff; font-size:12px; font-weight:700; flex:none; }
+    .options button.step-btn { display:flex; align-items:flex-start; }
+    .check-btn { margin-top:10px; min-height:36px; border:1px solid var(--accent); border-radius:6px; padding:6px 14px; background:var(--accent); color:#ffffff; font-weight:700; font-size:14px; cursor:pointer; }
+    .check-btn:hover:enabled { background:var(--accent-strong); border-color:var(--accent-strong); }
+    .check-btn:disabled { opacity:0.5; cursor:default; }
+    .qtype-tag { display:inline-block; margin-left:8px; padding:2px 9px; border-radius:999px; background:var(--warn-soft); color:var(--warn); font-size:11px; font-weight:700; vertical-align:2px; white-space:nowrap; }
+    .explain { display:none; margin:10px 0 0; padding:10px 12px; border-left:3px solid var(--accent); background:var(--accent-soft); border-radius:0 6px 6px 0; color:var(--text); }
+    .explain.show { display:block; }
+    .show-all .explain { display:block; }
+    .show-all .options button[data-correct="1"] { border-color:var(--accent-strong); background:var(--accent-soft); color:var(--accent-strong); font-weight:700; }
+    .verdict { font-weight:700; }
+    .verdict.good { color:var(--accent-strong); }
+    .verdict.bad { color:var(--warn); }
+    .bar-btn { min-height:38px; border:1px solid var(--accent); border-radius:6px; padding:7px 14px; background:var(--accent); color:#ffffff; font-weight:700; font-size:14px; cursor:pointer; }
+    .bar-btn:hover { background:var(--accent-strong); border-color:var(--accent-strong); }
+    .bar-btn.secondary { background:var(--panel); color:var(--text); border-color:var(--line); }
+    .bar-btn.secondary:hover { border-color:var(--accent); color:var(--accent-strong); background:var(--accent-soft); }
+    .source-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:12px; }
+    .source-grid article { padding:14px; margin-bottom:0; }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <p class="eyebrow">Systems study hub</p>
+      <h1>Systems Skills Revision and Question Practice</h1>
+    </div>
+    <nav aria-label="Site navigation">
+      <a href="index.html">Hub</a>
+      <a href="#db">Databases</a>
+      <a href="#os">OS &amp; Concurrency</a>
+      <a href="#dist">Distributed</a>
+      <a href="#net">Networking</a>
+      <a href="#infra">Infra</a>
+      <a href="#resources">Resources</a>
+    </nav>
+  </header>
+
+  <main id="main">
+    <section class="section intro">
+      <h2>Study Goal</h2>
+      <p>
+        Revision notes and practice questions for systems software-engineering assessment work, covering
+        five areas: databases and storage, operating systems with concurrency and runtimes, distributed
+        systems, networking, and infrastructure. Each section has a definitions list, core-concept cards
+        with tradeoffs and pitfalls, ASCII diagrams where a picture helps, further-reading links, and a
+        bank of practice questions with explanations in three formats: single-answer, select-all-that-apply,
+        and ordering chains. Difficulty runs from recall up to applied reasoning.
+      </p>
+    </section>
+
+    <div class="score-bar" id="score-bar">
+      <strong id="score-text">Score: 0 / 0</strong>
+      <p class="section-note" id="score-note"></p>
+      <div class="bar-buttons">
+        <button class="bar-btn secondary" id="toggle-explain" type="button">Show all explanations</button>
+        <button class="bar-btn" id="retry" type="button">Retry (reshuffle)</button>
+      </div>
+    </div>
+
+    <!-- ================= 1. DATABASES & STORAGE ================= -->
+    <section id="db" class="section">
+      <h2>1. Databases &amp; Storage</h2>
+      <p class="section-note">
+        How data actually lives on disk and stays correct under concurrency and crashes: storage engine
+        structures (B-trees, LSM-trees), the transaction machinery (ACID, isolation, MVCC, write-ahead
+        logging), indexing strategy, and how databases scale out with replication and partitioning.
+      </p>
+
+      <h3 class="sub">Key terms</h3>
+      <dl class="def-list">
+        <div><dt>ACID</dt><dd>Atomicity (all-or-nothing), Consistency (invariants hold), Isolation (concurrent transactions don't interfere), Durability (committed means survives a crash). The contract a transactional database offers.</dd></div>
+        <div><dt>Transaction</dt><dd>A group of reads and writes treated as one unit: either all of it commits or none of it does. The database's tool for multi-step invariants (debit one account, credit another).</dd></div>
+        <div><dt>B-tree</dt><dd>The classic storage/index structure: a wide, shallow, balanced tree of fixed-size pages. Reads and writes are O(log n) page accesses; updates happen in place. Default in Postgres, MySQL/InnoDB, SQL Server.</dd></div>
+        <div><dt>LSM-tree</dt><dd>Log-Structured Merge tree: writes buffer in a memtable, flush as sorted immutable files (SSTables), background compaction merges them. Fast sequential writes, reads may check several files. RocksDB, Cassandra, LevelDB.</dd></div>
+        <div><dt>WAL (write-ahead log)</dt><dd>Every change is appended to a sequential log <em>before</em> the data pages are touched. Commit = log flushed to disk. After a crash, replay the log to recover — durability from sequential I/O.</dd></div>
+        <div><dt>Index</dt><dd>A secondary structure (usually a B-tree) mapping column values to rows, turning full scans into seeks. Costs write amplification and space — every index must be maintained on each write.</dd></div>
+        <div><dt>Composite / covering index</dt><dd>Composite: an index over (a, b, c) — usable for prefixes (a), (a,b)… but not (b) alone. Covering: the index contains every column the query needs, so the table itself is never touched.</dd></div>
+        <div><dt>Selectivity</dt><dd>The fraction of rows a predicate matches. Indexes pay off on selective predicates (few rows); for low-selectivity ones (status = 'active' on 90% of rows) a scan is often cheaper.</dd></div>
+        <div><dt>Query planner</dt><dd>The optimizer that turns SQL into an execution plan using table statistics: which indexes, which join order, which join algorithm. <code>EXPLAIN</code> shows its choice — the first tool for slow queries.</dd></div>
+        <div><dt>Isolation levels</dt><dd>Read uncommitted → read committed → repeatable read → serializable: increasingly strict rules about what concurrent transactions can observe, trading anomaly prevention against concurrency.</dd></div>
+        <div><dt>Anomalies</dt><dd>Dirty read (see uncommitted data), non-repeatable read (row changes between two reads), phantom (new rows appear matching your predicate), lost update, write skew (two txns each read then write disjoint rows, jointly violating an invariant).</dd></div>
+        <div><dt>MVCC</dt><dd>Multi-Version Concurrency Control: writers create new row versions instead of overwriting; readers see a snapshot as of their start. Readers never block writers and vice versa. Postgres, InnoDB, Oracle.</dd></div>
+        <div><dt>Two-phase locking / deadlock</dt><dd>Lock-based isolation: acquire locks as you go, hold until commit. Two transactions locking rows in opposite orders deadlock; the database detects the cycle and kills one victim.</dd></div>
+        <div><dt>Normalization</dt><dd>Structuring tables so each fact is stored once (3NF and friends): no update anomalies, at the cost of joins. Denormalization copies data to kill joins — buy read speed with update complexity.</dd></div>
+        <div><dt>Replication</dt><dd>Copies of the data on multiple nodes: a leader takes writes and streams them to followers (read scaling, failover). Async replication risks losing the last writes on failover; sync costs latency.</dd></div>
+        <div><dt>Replication lag</dt><dd>The delay before a follower reflects the leader's writes. Read-your-own-writes violations ("I posted but it's gone") come from reading a lagging replica right after writing to the leader.</dd></div>
+        <div><dt>Sharding / partitioning</dt><dd>Splitting one dataset across nodes by a partition key (hash or range). Scales writes and size — but cross-shard queries and transactions become the application's problem. Hot keys skew load.</dd></div>
+        <div><dt>NoSQL families</dt><dd>Key-value (Redis, DynamoDB), document (MongoDB), wide-column (Cassandra), graph (Neo4j). Trade relational joins/transactions for a data model and scaling shape that fits the access pattern.</dd></div>
+        <div><dt>OLTP vs OLAP</dt><dd>Transaction processing: many small point reads/writes, row storage. Analytics: few huge scans/aggregations over billions of rows, column storage. Different engines because the access patterns are opposite.</dd></div>
+        <div><dt>Columnar storage</dt><dd>Store each column contiguously instead of each row: scans touch only needed columns, values compress extremely well (same type, similar values). ClickHouse, Parquet, BigQuery, Redshift.</dd></div>
+        <div><dt>Connection pooling</dt><dd>Database connections are expensive (memory, handshake, per-connection process in Postgres); a pool reuses a bounded set. Unbounded connections are a classic way applications take databases down.</dd></div>
+      </dl>
+
+      <h3 class="sub">Core concepts</h3>
+      <div class="term-grid">
+        <article class="term-card"><h3>B-tree vs LSM-tree</h3><p>Two answers to "disks like sequential I/O". B-trees update pages in place: reads are predictable (one path root→leaf), writes cost random I/O and page splits. LSM-trees never update in place: writes are sequential appends (memtable → SSTable flush), so write throughput is superb; reads must consult memtable + several SSTables (bloom filters keep this sane), and background compaction consumes I/O — write amplification moves from foreground to background. Rule of thumb: read-heavy/OLTP → B-tree; write-heavy ingest (metrics, events, logs) → LSM. This is also why Cassandra ingests fast but point reads cost more than in Postgres.</p></article>
+        <article class="term-card"><h3>WAL and crash recovery</h3><p>Durability is not "write the data page" — that's random I/O and might be half-done at power loss. Instead: append the change to the WAL, fsync the log, acknowledge commit; the actual pages update later (checkpoints reconcile). Crash? Replay the log forward from the last checkpoint (redo), roll back losers (undo). Consequences worth knowing: commit latency ≈ one sequential fsync, group commit amortizes it across transactions, replication is usually just shipping the WAL, and turning off fsync trades durability for speed (fine for a cache, fatal for money).</p></article>
+        <article class="term-card"><h3>Isolation levels as a menu</h3><p>Serializable is "as if one at a time" — always correct, historically slow, now practical (Postgres SSI). Most databases default lower: read committed (Postgres) blocks dirty reads only — two reads in one transaction can disagree; repeatable read/snapshot (InnoDB default, Postgres RR) gives each transaction a frozen snapshot — but write skew slips through: two doctors both read "2 on call", each removes themselves, invariant broken, no conflict detected under snapshot isolation. Fixes at lower levels: <code>SELECT … FOR UPDATE</code> to lock what you read, unique/check constraints, or explicit serializable for the few transactions that need it.</p></article>
+        <article class="term-card"><h3>Indexing strategy</h3><p>An index earns its keep when it turns a scan of millions into a seek of dozens. Composite index column order matters: (tenant_id, created_at) serves "this tenant, recent first" perfectly and "all tenants yesterday" not at all — leftmost prefix rule. A covering index answers the query from the index alone (index-only scan). Every index taxes every INSERT/UPDATE and competes for cache. Functions on the indexed column (<code>WHERE lower(email) = …</code>) disable the index unless you index the expression. Workflow: find the slow query, EXPLAIN it, check what the planner sees, then add the one index that changes the plan.</p></article>
+        <article class="term-card"><h3>Scaling: replicas, then shards</h3><p>First move: leader-follower replication — reads fan out to replicas, writes stay on the leader. Costs: replication lag (stale reads; route read-your-writes traffic to the leader) and failover risk with async replication (unreplicated commits lost — a split brain if the old leader comes back). When writes or data size outgrow one leader: shard by a partition key. Choose the key by access pattern — hash of user_id spreads load but kills range queries; range keys keep scans but invite hot spots (today's date!). Cross-shard joins and transactions mostly stop existing; design so 99% of queries are single-shard.</p></article>
+        <article class="term-card"><h3>Choosing a database</h3><p>Default to a relational database until the access pattern says otherwise: transactions, joins, constraints, and 50 years of tooling are hard to beat. Reach for key-value when it's literally get/put by key at scale (sessions, carts); document when entities are self-contained aggregates read whole; wide-column for write-heavy time-series/event floods; search engines for text; columnar warehouses for analytics — often <em>alongside</em> the OLTP store, fed by CDC (change data capture), not instead of it. The expensive mistake is usually not the wrong engine but scattering one logical fact across engines with no source of truth.</p></article>
+      </div>
+
+      <p class="diagram-title">B-tree — one seek path, wide and shallow</p>
+      <pre class="diagram">SELECT * FROM users WHERE id = 42;
+                        ┌────────────────┐
+             root       │  20   |   50   │           each page: hundreds of keys
+                        └──┬────┴────┬───┘           3-4 levels reach billions
+              ┌────────────┘         └──────────┐
+        ┌─────▼─────┐                     ┌─────▼─────┐
+inner   │ 25 | 30 | 40 │      ...         │ 60 | 75   │
+        └──┬────────────┘                 └───────────┘
+   ┌───────▼──┐
+leaf   │ 40,41,42,43 │ ──▶ row data (or pointer to heap)
+       └────────────┘
+lookup = log_fanout(n) page reads, most cached in RAM.
+range scan: walk leaf level left→right (leaves are linked).
+write: find leaf, update in place; full page → SPLIT (why B-trees
+prefer fill factor &lt; 100%)</pre>
+
+      <p class="diagram-title">LSM-tree — writes go forward, reads look back</p>
+      <pre class="diagram">write path:                              read path (key k):
+  put(k,v)                                 1. memtable?
+    │                                      2. L0 SSTables (newest first)?
+    ▼                                      3. L1, L2 … (bloom filter per
+  WAL append (durability)                     file says "definitely not
+    │                                         here" → skip)
+    ▼
+  memtable (sorted, in RAM)              compaction (background):
+    │ full? flush                          merge overlapping SSTables,
+    ▼                                      drop overwritten/deleted keys,
+  SSTable L0 (immutable, sorted file)      push down a level
+    │ compaction merges downward
+    ▼
+  L1 → L2 → … (bigger, older)
+sequential writes only ⇒ huge ingest throughput;
+cost = read amplification + background compaction I/O</pre>
+
+      <p class="diagram-title">WAL commit — why durability is a sequential append</p>
+      <pre class="diagram">BEGIN; UPDATE accounts SET bal = bal-100 WHERE id=1;
+       UPDATE accounts SET bal = bal+100 WHERE id=2;  COMMIT;
+
+  buffer pool (RAM)                     disk
+  ┌──────────────────┐     1. append   ┌────────────────────────┐
+  │ page A: id1 bal' │ ─────────────▶  │ WAL: [txn9: A:-100,    │
+  │ page B: id2 bal' │    (redo recs)  │       B:+100, COMMIT]  │
+  └──────────────────┘                 └────────────────────────┘
+        │                    2. fsync WAL ──▶ COMMIT acknowledged ✔
+        │ 3. later, checkpoint writes dirty pages A,B in place
+        ▼
+  crash between 2 and 3?  restart replays WAL → pages rebuilt. nothing lost.
+  crash before 2?         no COMMIT record → txn rolled back. atomicity.</pre>
+
+      <p class="diagram-title">Isolation anomalies — who sees what</p>
+      <pre class="diagram">level             │ dirty read │ non-repeatable │ phantom │ write skew
+──────────────────┼────────────┼────────────────┼─────────┼───────────
+read uncommitted  │  possible  │    possible    │ possible│  possible
+read committed    │     no     │    possible    │ possible│  possible
+repeatable read / │     no     │       no       │ mostly  │  possible
+  snapshot (MVCC) │            │                │  no*    │  ← the trap
+serializable      │     no     │       no       │   no    │     no
+
+write skew: txn1 reads X,Y then writes X; txn2 reads X,Y then writes Y.
+both commit under snapshot isolation — combined result violates the
+invariant both checked. fix: SERIALIZABLE or SELECT ... FOR UPDATE.
+(* Postgres RR blocks phantoms; InnoDB RR mostly via gap locks)</pre>
+
+      <div class="link-list">
+        <a href="https://www.postgresql.org/docs/current/mvcc.html" target="_blank" rel="noopener">PostgreSQL — Concurrency Control (MVCC)</a>
+        <a href="https://use-the-index-luke.com/" target="_blank" rel="noopener">Use The Index, Luke — SQL indexing guide</a>
+        <a href="https://dataintensive.net/" target="_blank" rel="noopener">Designing Data-Intensive Applications (Kleppmann)</a>
+        <a href="https://www.sqlite.org/arch.html" target="_blank" rel="noopener">SQLite architecture — a readable real engine</a>
+      </div>
+
+      <h3 class="sub">Practice questions</h3>
+      <span class="sec-score" id="sec-score-db">Section score: 0 / 0</span>
+      <div class="quiz" data-section="db"></div>
+    </section>
+
+    <!-- ================= 2. OS, CONCURRENCY & RUNTIME ================= -->
+    <section id="os" class="section">
+      <h2>2. OS, Concurrency &amp; Runtime</h2>
+      <p class="section-note">
+        What the machine gives your program: processes, threads, and virtual memory; how the kernel
+        schedules and mediates everything through syscalls; the concurrency toolbox (locks, atomics,
+        memory ordering) and its failure modes; and how CPU caches and async runtimes shape performance.
+      </p>
+
+      <h3 class="sub">Key terms</h3>
+      <dl class="def-list">
+        <div><dt>Process</dt><dd>A running program with its own virtual address space, file descriptors, and at least one thread. Isolation boundary: one process cannot scribble on another's memory.</dd></div>
+        <div><dt>Thread</dt><dd>An execution stream inside a process: own stack and registers, <em>shared</em> heap and globals with its siblings. Cheap to communicate, easy to corrupt shared state.</dd></div>
+        <div><dt>Virtual memory</dt><dd>Each process sees a private, contiguous address space; the MMU maps virtual pages (typically 4 KB) to physical frames via page tables. Enables isolation, overcommit, swapping, and mmap.</dd></div>
+        <div><dt>Page fault</dt><dd>Access to a page with no valid mapping traps to the kernel. Minor: page is in RAM, just map it (cheap, how demand loading works). Major: fetch from disk (milliseconds — the performance cliff).</dd></div>
+        <div><dt>TLB</dt><dd>Translation Lookaside Buffer: a tiny cache of virtual→physical translations. Misses force a page-table walk; huge pages exist largely to relieve TLB pressure.</dd></div>
+        <div><dt>Syscall</dt><dd>The only door into the kernel: read, write, open, mmap, futex… A controlled mode switch (user→kernel), tens to hundreds of ns — cheap, but not free in a hot loop.</dd></div>
+        <div><dt>Context switch</dt><dd>The scheduler swaps which thread a CPU runs: save registers, switch stacks (and page tables across processes), warm caches go cold. Microseconds each — thousands per second is overhead you can measure.</dd></div>
+        <div><dt>Scheduler</dt><dd>Kernel component multiplexing runnable threads over CPUs, balancing fairness, latency (interactive tasks), and throughput. Preemptive: a timer interrupt can take the CPU away anytime.</dd></div>
+        <div><dt>Race condition</dt><dd>Outcome depends on unsynchronized timing of concurrent accesses (at least one write). Compiles fine, passes tests, corrupts data in production at 3 a.m.</dd></div>
+        <div><dt>Mutex</dt><dd>Mutual exclusion lock: one thread in the critical section at a time. Uncontended lock/unlock is nanoseconds (a CAS); contended means futex sleep — a syscall and context switch.</dd></div>
+        <div><dt>Semaphore</dt><dd>A counter with atomic wait (decrement-or-block) and signal (increment): bounds concurrent access to N (connection limits, bounded queues). A mutex is roughly a binary semaphore with ownership.</dd></div>
+        <div><dt>Condition variable</dt><dd>Wait (releasing a held mutex) until another thread signals a condition may now hold. Always re-check the predicate in a while loop — spurious wakeups are allowed.</dd></div>
+        <div><dt>Deadlock</dt><dd>Threads waiting on each other in a cycle, forever. Requires four conditions (mutual exclusion, hold-and-wait, no preemption, circular wait); break any one — most practically, a global lock order.</dd></div>
+        <div><dt>Atomic / CAS</dt><dd>Hardware-indivisible operations (compare-and-swap, fetch-and-add) on single words. The building block of every lock and lock-free structure. CAS loops retry under contention.</dd></div>
+        <div><dt>Memory ordering</dt><dd>Compilers and CPUs reorder memory accesses; other threads may observe writes out of program order. Atomics with acquire/release (or seq_cst) semantics insert the barriers that forbid it.</dd></div>
+        <div><dt>Cache line / coherence</dt><dd>CPUs move memory in 64-byte lines; MESI keeps per-core caches coherent — a write invalidates the line in every other core's cache. Coherence traffic is the hidden cost of sharing.</dd></div>
+        <div><dt>False sharing</dt><dd>Two threads write different variables that share a cache line: the line ping-pongs between cores as if they contended on one variable. Fix: pad/align hot per-thread data.</dd></div>
+        <div><dt>epoll / IO multiplexing</dt><dd>One thread waits on thousands of sockets and is told which are ready (epoll/kqueue/IOCP). The engine under nginx, Node, and every async runtime — replaces thread-per-connection.</dd></div>
+        <div><dt>Async runtime / event loop</dt><dd>Many logical tasks multiplexed on few threads: tasks yield at await points instead of blocking. Cheap concurrency for I/O-bound work; one CPU-hogging or blocking call stalls every task on that thread.</dd></div>
+        <div><dt>mmap</dt><dd>Map a file (or anonymous memory) into the address space: file I/O becomes memory access, pages loaded on fault, shared mappings enable zero-copy IPC. How executables and shared libraries load.</dd></div>
+        <div><dt>Garbage collection</dt><dd>Runtime reclaims unreachable heap objects (tracing: mark live from roots, sweep/compact the rest). Generational GCs exploit "most objects die young". Cost model: allocation rate and pause sensitivity.</dd></div>
+      </dl>
+
+      <h3 class="sub">Core concepts</h3>
+      <div class="term-grid">
+        <article class="term-card"><h3>Virtual memory earns its keep</h3><p>One mechanism, many features: isolation (your pointer literally cannot name another process's memory), demand paging (start instantly, fault pages in as touched), copy-on-write (fork is cheap; both processes share pages until one writes), shared libraries (one libc in RAM, mapped everywhere), mmap-ed files, and overcommit. The costs surface as page faults — minor ones are routine; major faults mean disk, and a working set larger than RAM means thrashing: the machine is "busy" doing nothing but I/O. <code>top</code> shows it as high wait, low user CPU.</p></article>
+        <article class="term-card"><h3>Threads vs async — pick by workload</h3><p>Thread-per-request is simple and exploits all cores, but each thread costs stack memory and context switches; 10k blocked threads is real scheduler pressure. Async/event-loop flips it: thousands of I/O-bound tasks on a handful of threads, each parked task just a small state machine — this is how one box holds 100k connections. The catch: the loop must never block — one synchronous file read or CPU-heavy handler freezes every task behind it (offload to a worker pool). CPU-bound work wants threads ≈ cores and no async ceremony at all. Most servers end hybrid: event loop for I/O, pool for crunching.</p></article>
+        <article class="term-card"><h3>The data race, precisely</h3><p>Two threads access the same location, at least one writes, no synchronization orders them — that's a data race, and in C/C++/Go it's undefined behavior, not merely nondeterminism: the compiler assumed no race when optimizing. <code>count++</code> is three operations; two threads interleave and increments vanish. Fixes ordered by preference: don't share (per-thread data, message passing); share immutably; share behind a mutex; atomics for counters and flags. Tools catch what review misses: ThreadSanitizer and Go's <code>-race</code> find real interleavings in tests — run them in CI.</p></article>
+        <article class="term-card"><h3>Locks that don't hurt</h3><p>Granularity is the game: one big lock is correct but serializes everything (Python's GIL); fine-grained locks scale but invite deadlock and subtle ordering bugs. Rules that survive contact with production: keep critical sections tiny (never do I/O holding a lock), acquire multiple locks in one global order everywhere, prefer reader-writer locks only when reads truly dominate (they're costlier than they look), and measure contention before "optimizing" it. When a counter is the hot spot, an atomic beats a mutex; when a structure is, sharding it (N locks by key hash) usually beats lock-free heroics.</p></article>
+        <article class="term-card"><h3>Memory ordering exists</h3><p>The classic trap: thread A writes <code>data = 42; ready = true;</code> thread B spins on <code>ready</code> then reads <code>data</code> — and sees stale data, because compiler or CPU reordered the writes, or hoisted the read of a plain <code>ready</code> out of the loop entirely. Plain loads/stores promise nothing across threads. Release store on <code>ready</code> + acquire load pairs them: everything written before the release is visible after the acquire. That release/acquire pair is exactly what mutex unlock/lock gives you — which is why "just use a lock" is correct advice, and why lock-free code is expert territory.</p></article>
+        <article class="term-card"><h3>Mechanical sympathy</h3><p>Latency ladder, roughly: L1 ~1 ns, L2 ~4 ns, L3 ~a dozen, RAM ~100 ns, SSD ~100 µs, disk seek ~ms, same-DC network ~500 µs. Two consequences dominate real profiles: locality (arrays beat pointer-chasing linked structures because the prefetcher can see the future) and sharing costs (every cross-core write to a shared line pays coherence traffic — false sharing makes "independent" counters contend). Branch mispredicts flush pipelines; syscalls and context switches trash caches. Optimizing = measuring first: perf, flame graphs, and cache-miss counters, not intuition.</p></article>
+      </div>
+
+      <p class="diagram-title">Virtual address translation — page tables and the TLB</p>
+      <pre class="diagram">thread loads *p  (virtual addr 0x7f3a_2000_0abc)
+        │
+        ▼                hit (≈ free)
+   ┌─ TLB? ─────────────────────────▶ physical addr → L1/L2/L3/RAM
+        │ miss
+        ▼
+   page table walk (4 levels on x86-64, hardware)
+        │
+        ├─ mapping valid ──▶ fill TLB, retry
+        │
+        └─ not present ──▶ PAGE FAULT (trap to kernel)
+              ├─ minor: page in RAM (demand load / COW) → map it, resume
+              ├─ major: read from disk/swap (~ms!) → map, resume
+              └─ invalid: SIGSEGV
+isolation = each process has its own page tables;
+context switch across processes swaps them (and TLB entries)</pre>
+
+      <p class="diagram-title">Deadlock — the cycle, and the fix</p>
+      <pre class="diagram">thread 1: lock(A) ──────▶ wants B (blocked)
+thread 2: lock(B) ──────▶ wants A (blocked)
+
+        holds          wants
+  T1 ────────▶ A   T1 ─────▶ B ◀──────── holds T2
+  T2 ────────▶ B   T2 ─────▶ A            cycle ⇒ deadlock, forever
+
+four necessary conditions:  mutual exclusion, hold-and-wait,
+                            no preemption, circular wait
+practical fix: GLOBAL LOCK ORDER — every thread that needs
+both takes A before B. no cycle can form.
+(also: try_lock with backoff, or one coarser lock)</pre>
+
+      <p class="diagram-title">count++ is not atomic — the lost update</p>
+      <pre class="diagram">shared: count = 0        thread 1              thread 2
+                          load  r ← count(0)
+                                                load  r ← count(0)
+                          add   r ← 1
+                          store count ← 1
+                                                add   r ← 1
+                                                store count ← 1   ◀ overwrites!
+result: count == 1 after two increments — one update LOST.
+
+fixes:  mutex around the ++            (general, pessimistic)
+        atomic fetch_add(count, 1)     (single word, lock-free)
+        per-thread counters, sum later (no sharing at all — fastest)</pre>
+
+      <p class="diagram-title">Thread-per-connection vs event loop</p>
+      <pre class="diagram">thread-per-connection (10k conns):     event loop + epoll (10k conns):
+┌────┐┌────┐┌────┐     ┌────┐          ┌──────────────────────────────┐
+│ T1 ││ T2 ││ T3 │ ... │T10k│          │ one thread:                  │
+│read││read││read│     │read│          │  ready = epoll_wait(...)     │
+│BLOCKED  BLOCKED      BLOCKED         │  for fd in ready:            │
+└────┘└────┘└────┘     └────┘          │     resume that task         │
+10k stacks (GBs), scheduler            └──────────────────────────────┘
+churn, ctx switches                    tasks = small state machines
+                                       rule: NEVER block the loop —
+async/await = this, with the           one sync call stalls all 10k
+state machines written for you         (offload CPU work to a pool)</pre>
+
+      <div class="link-list">
+        <a href="https://pages.cs.wisc.edu/~remzi/OSTEP/" target="_blank" rel="noopener">Operating Systems: Three Easy Pieces (free book)</a>
+        <a href="https://man7.org/linux/man-pages/man7/epoll.7.html" target="_blank" rel="noopener">epoll(7) — Linux manual</a>
+        <a href="https://preshing.com/20120913/acquire-and-release-semantics/" target="_blank" rel="noopener">Acquire and release semantics — Preshing</a>
+        <a href="https://www.brendangregg.com/linuxperf.html" target="_blank" rel="noopener">Linux performance tools — Brendan Gregg</a>
+      </div>
+
+      <h3 class="sub">Practice questions</h3>
+      <span class="sec-score" id="sec-score-os">Section score: 0 / 0</span>
+      <div class="quiz" data-section="os"></div>
+    </section>
+
+    <!-- ================= 3. DISTRIBUTED SYSTEMS ================= -->
+    <section id="dist" class="section">
+      <h2>3. Distributed Systems</h2>
+      <p class="section-note">
+        What changes when the system spans machines that fail independently and a network that loses,
+        delays, and duplicates messages: consistency models and CAP, consensus and quorums, delivery
+        guarantees and idempotency, distributed transactions, and the defensive patterns — timeouts,
+        retries with jitter, circuit breakers, fencing tokens.
+      </p>
+
+      <h3 class="sub">Key terms</h3>
+      <dl class="def-list">
+        <div><dt>Partial failure</dt><dd>The defining property: some nodes/links fail while others work, and you often cannot tell "crashed" from "slow" from "unreachable". A timeout is a suspicion, not a fact.</dd></div>
+        <div><dt>CAP theorem</dt><dd>During a network Partition you must choose: refuse some requests (Consistency) or serve possibly-stale data (Availability). No partition, no forced choice — see PACELC for the latency tradeoff the rest of the time.</dd></div>
+        <div><dt>Linearizability</dt><dd>The strong one: every operation appears to take effect atomically at some instant between its start and end; after a write completes, all reads see it. What single-node RAM gives you; expensive across nodes.</dd></div>
+        <div><dt>Eventual consistency</dt><dd>Replicas converge if writes stop; meanwhile reads may be stale or out of order. Fine for likes and carts; dangerous for uniqueness, balances, and anything with "exactly" in the requirement.</dd></div>
+        <div><dt>Causal consistency</dt><dd>Middle ground: effects are seen after their causes (reply never appears before the post it answers), without paying for a global order of everything.</dd></div>
+        <div><dt>Consensus (Raft/Paxos)</dt><dd>Protocol for nodes to agree on a value/log despite crashes: elect a leader, replicate entries, commit when a majority has them. Raft is the understandable one — etcd, Consul, CockroachDB.</dd></div>
+        <div><dt>Quorum</dt><dd>Majority (or R/W-configurable) subset that must participate. With N replicas, W + R &gt; N makes read and write sets overlap, so a read meets the newest write. Majorities also prevent two leaders.</dd></div>
+        <div><dt>Split brain</dt><dd>Two halves of a partitioned cluster each believe they're in charge and accept conflicting writes. Prevented by majority quorums — the minority side must stop serving.</dd></div>
+        <div><dt>Fencing token</dt><dd>Monotonic number issued with a lock/lease; storage rejects writes with an older token. Defends against the zombie: a paused ex-leader waking up and writing as if it still held the lease.</dd></div>
+        <div><dt>Replication: sync vs async</dt><dd>Sync: leader waits for follower ack — durable but slow, stalls if the follower dies. Async: fast, but failover loses the tail of unreplicated writes. Semi-sync (wait for one of K) is the common compromise.</dd></div>
+        <div><dt>Idempotency</dt><dd>Applying an operation twice equals applying it once (PUT x=5 yes; "add $100" no). The only practical route to "effectively exactly once": at-least-once delivery + idempotent handlers (dedupe keys).</dd></div>
+        <div><dt>Delivery guarantees</dt><dd>At-most-once (may drop, never duplicates), at-least-once (never drops, may duplicate — the practical default), exactly-once (end-to-end, only as at-least-once + dedupe/transactions).</dd></div>
+        <div><dt>Two-phase commit (2PC)</dt><dd>Coordinator asks all participants to prepare (vote), then broadcasts commit/abort. Atomic across systems — but blocking: participants hold locks while a crashed coordinator is down.</dd></div>
+        <div><dt>Saga</dt><dd>Long transaction as a chain of local transactions, each with a compensating action (refund, release, cancel) run in reverse on failure. Trades atomicity for availability; intermediate states are visible.</dd></div>
+        <div><dt>Outbox pattern / CDC</dt><dd>Write the business row and an "event to publish" row in one local transaction; a relay publishes from the outbox. Kills the "DB committed but message never sent" dual-write bug.</dd></div>
+        <div><dt>Logical / vector clocks</dt><dd>Physical clocks skew, so order by causality instead: Lamport clocks give a consistent order; vector clocks additionally detect that two updates were concurrent (a real conflict).</dd></div>
+        <div><dt>CRDT</dt><dd>Conflict-free Replicated Data Type: state merges commutatively, so concurrent updates converge without coordination (G-counter, OR-set). Collaborative editors, offline-first apps.</dd></div>
+        <div><dt>Retry + backoff + jitter</dt><dd>Retry transient failures with exponentially growing waits and randomization. No jitter → synchronized retry stampedes. Only retry idempotent operations blindly.</dd></div>
+        <div><dt>Circuit breaker</dt><dd>After repeated failures to a dependency, fail fast for a cooldown instead of stacking timeouts — protects your threads and the struggling service; half-open probes test recovery.</dd></div>
+        <div><dt>Backpressure</dt><dd>Slowing producers when consumers lag (bounded queues, credit windows) instead of buffering forever. Unbounded queues turn overload into memory exhaustion plus latency you can't recover from.</dd></div>
+      </dl>
+
+      <h3 class="sub">Core concepts</h3>
+      <div class="term-grid">
+        <article class="term-card"><h3>The network is the problem</h3><p>Every distributed-systems pattern is downstream of one fact: messages can be lost, delayed, reordered, or duplicated, and a non-answer doesn't tell you which. Send a request, get silence — did it fail before processing, or after? You cannot know; you can only time out and decide what to do with the ambiguity. That's why retries exist (and demand idempotency), why "did the payment go through" is a design problem, and why leases and fencing tokens replace "I'm sure it's dead" with mechanisms that stay safe when you're wrong. Design rule: every remote call has a timeout, a retry policy, and an answer to "what if it executed twice?"</p></article>
+        <article class="term-card"><h3>CAP without the folklore</h3><p>CAP is narrower than its reputation: only during a partition must you pick consistency (some requests error/wait) or availability (serve stale). The everyday tradeoff is PACELC's other half — Else, latency vs consistency: a linearizable read must coordinate (quorum round trip); a local replica read is fast and possibly stale. Pick per operation, not per system: account balance and username uniqueness want CP paths; feeds, counts, and sessions tolerate staleness happily. Systems advertise this as read/write concern levels (Dynamo-style R/W, Mongo readConcern, etc.) — the knobs are the theorem made concrete.</p></article>
+        <article class="term-card"><h3>Raft in one breath</h3><p>Nodes are followers until heartbeats stop; a timed-out follower becomes candidate, requests votes, and a majority makes it leader for that term. Clients talk to the leader; it appends entries to its log, replicates, and commits once a majority holds them — then followers apply. Safety comes from majorities overlapping: any new leader's electorate contains a node with every committed entry, and voters refuse candidates with stale logs. Terms fence off zombies (higher term wins, old leader steps down). A 5-node cluster survives 2 failures; the minority side of a partition can't elect anyone or commit anything — that's the split-brain proof.</p></article>
+        <article class="term-card"><h3>Exactly-once is a team effort</h3><p>The broker can promise at-least-once; "exactly once" is something you build end to end. Producer side: outbox pattern so the DB write and the event publish can't disagree. Consumer side: dedupe on an idempotency key (store processed IDs transactionally with the side effect), or make the operation naturally idempotent (set, not increment). The same discipline covers API design: clients send an idempotency key with POSTs, the server stores the first response and replays it on retry — Stripe-style. If a handler isn't idempotent and isn't deduped, at-least-once delivery <em>will</em> eventually double-charge someone.</p></article>
+        <article class="term-card"><h3>Distributed transactions, reluctantly</h3><p>Cross-service atomicity is expensive in every currency. 2PC gives real atomicity but blocks: prepared participants hold locks while a dead coordinator is down, and availability multiplies down across participants — which is why it rarely crosses trust or service boundaries. Sagas accept non-atomicity: local commits plus compensations, with visible intermediate states and business-level design for "booked then unbooked". Often the honest fix is upstream: redraw service boundaries so the invariant lives inside one database, where a plain transaction handles it. The best distributed transaction is the one you refactored away.</p></article>
+        <article class="term-card"><h3>Defensive patterns that compose</h3><p>Overload cascades are the classic outage shape: one slow dependency, callers pile up retries, thread pools drain, everything upstream browns out. The standard kit, layered: timeouts on everything (deadline propagation so the whole chain shares one budget), exponential backoff with jitter (spread the herd), retry budgets (retries as a % of traffic, not per-request heroics), circuit breakers (fail fast when it's clearly down), bounded queues with load shedding (reject early beats collapse later), and bulkheads (per-dependency pools so one bad neighbor can't take the house). Each is simple; reliability is their composition.</p></article>
+      </div>
+
+      <p class="diagram-title">Raft — election and commit, term by term</p>
+      <pre class="diagram">5 nodes, term 3, leader L heartbeating ─────────────────────────▶ time
+  L ──╳ crash
+        follower F1: heartbeat timeout → term 4, candidate
+        F1 → RequestVote(term 4, my log is up-to-date)
+        F2, F3 vote yes (3/5 = majority) → F1 is LEADER term 4
+        (F with stale log would be refused votes → safety)
+
+commit path (leader F1):
+  client → F1: append x=7 to log[n]
+  F1 → AppendEntries(x=7) → F2 ✔  F3 ✔        majority holds it
+  F1: entry n COMMITTED → apply, reply client → tell followers
+old leader wakes with term 3 → sees term 4 → steps down (fencing).
+minority partition: no majority → no leader, no commits. no split brain.</pre>
+
+      <p class="diagram-title">Quorum overlap — why W + R &gt; N reads fresh data</p>
+      <pre class="diagram">N = 5 replicas, W = 3, R = 3
+write x=9 ──▶ { A, B, C } ack           read ──▶ { C, D, E } respond
+                                                   │
+              any W-set and R-set of 3 MUST overlap (3+3 &gt; 5): here C
+              C has x=9 (with newest version/timestamp) → read returns 9
+
+W=1, R=1 (fast, available):  write hits A, read hits E → stale read OK?
+   your call — that's the C-vs-latency dial, per operation.
+sloppy quorums / async repair push this further toward availability.</pre>
+
+      <p class="diagram-title">2PC vs saga — atomic and blocking vs available and compensated</p>
+      <pre class="diagram">2PC:  coordinator      participants (order, payment, stock)
+        │ PREPARE? ──▶  each: lock, write undo/redo, vote YES/NO
+        │ ◀── all YES
+        │ COMMIT ────▶  apply, release locks
+      coordinator dies between phases ⇒ participants BLOCK, locks held ✗
+
+saga: order svc ──▶ payment svc ──▶ stock svc
+        T1 commit     T2 commit      T3 FAILS
+                                       │ compensate in reverse:
+        C1 cancel ◀── C2 refund  ◀────┘
+      no global locks, always available — but T1/T2 were VISIBLE
+      before compensation: design for "paid then refunded" states.</pre>
+
+      <p class="diagram-title">Retry stampede — why jitter is not optional</p>
+      <pre class="diagram">without jitter:                        with exp backoff + full jitter:
+t=0   1000 clients fail together       t=0    1000 fail
+t=1s  1000 retry AT ONCE ─▶ overload   t=~U(0,1s)   retries spread ░░░░░░
+t=2s  1000 retry again    ─▶ overload  t=~U(0,2s)   thinner  ░ ░ ░ ░ ░
+      service never recovers            t=~U(0,4s)   recovering service
+                                                     absorbs the trickle
+retry = wait(random(0, base·2^attempt)), cap attempts, retry budget,
+and ONLY retry idempotent ops. plus circuit breaker: repeated failure
+⇒ fail fast (open) → after cooldown, let a probe through (half-open).</pre>
+
+      <div class="link-list">
+        <a href="https://raft.github.io/" target="_blank" rel="noopener">Raft — paper and interactive visualization</a>
+        <a href="https://aws.amazon.com/builders-library/timeouts-retries-and-backoff-with-jitter/" target="_blank" rel="noopener">Timeouts, retries, and backoff with jitter — AWS Builders' Library</a>
+        <a href="https://jepsen.io/consistency" target="_blank" rel="noopener">Consistency models map — Jepsen</a>
+        <a href="https://martin.kleppmann.com/2016/02/08/how-to-do-distributed-locking.html" target="_blank" rel="noopener">How to do distributed locking (fencing tokens) — Kleppmann</a>
+      </div>
+
+      <h3 class="sub">Practice questions</h3>
+      <span class="sec-score" id="sec-score-dist">Section score: 0 / 0</span>
+      <div class="quiz" data-section="dist"></div>
+    </section>
+
+    <!-- ================= 4. NETWORKING ================= -->
+    <section id="net" class="section">
+      <h2>4. Networking</h2>
+      <p class="section-note">
+        The path a request actually takes: DNS, TCP's reliability machinery and congestion control, TLS 1.3,
+        and the HTTP generations' fight against head-of-line blocking — plus the operational layer of load
+        balancers, NAT, and tail latency.
+      </p>
+
+      <h3 class="sub">Key terms</h3>
+      <dl class="def-list">
+        <div><dt>Layered model</dt><dd>Each layer uses the one below and serves the one above: link (Ethernet/WiFi) → network (IP, best-effort packets) → transport (TCP/UDP, end-to-end) → application (HTTP, DNS, TLS in between). Encapsulation: each layer wraps the payload with its header.</dd></div>
+        <div><dt>IP</dt><dd>Best-effort packet delivery between addresses across networks: packets may be lost, reordered, duplicated. Routers forward hop by hop by destination prefix. Everything reliable is built on top.</dd></div>
+        <div><dt>TCP</dt><dd>Reliable, ordered byte stream over IP: sequence numbers, acks, retransmission, flow control, congestion control. Connection-oriented — the 3-way handshake establishes state on both ends.</dd></div>
+        <div><dt>UDP</dt><dd>Just IP plus ports: no connection, no ordering, no retransmission. For when the application wants control (DNS queries, QUIC, games, video) or can't afford TCP's machinery.</dd></div>
+        <div><dt>3-way handshake</dt><dd>SYN → SYN-ACK → ACK: exchanges initial sequence numbers and establishes the connection. One RTT before any data — why connection reuse and 0-RTT tricks matter.</dd></div>
+        <div><dt>Flow control</dt><dd>Receiver advertises a window ("I can buffer this much"); sender never exceeds it. Protects the <em>receiver</em>. Distinct from congestion control, which protects the <em>network</em>.</dd></div>
+        <div><dt>Congestion control</dt><dd>Sender probes network capacity: slow start (exponential growth) until loss/ECN, then additive increase/multiplicative decrease around a congestion window. CUBIC and BBR are the modern algorithms.</dd></div>
+        <div><dt>Head-of-line blocking</dt><dd>One lost/slow item stalls everything queued behind it: a lost TCP segment blocks delivery of all later bytes (kernel holds them until the gap fills), one slow HTTP/1.1 response blocks the pipeline.</dd></div>
+        <div><dt>DNS</dt><dd>The hierarchy that turns names into records: stub → recursive resolver → root → TLD → authoritative, with caching by TTL at every step. A / AAAA (addresses), CNAME (alias), MX, NS, TXT.</dd></div>
+        <div><dt>TTL / caching</dt><dd>Each DNS record carries a time-to-live; resolvers serve from cache until expiry. Low TTL = fast failover, more queries; high TTL = efficient, slow to change. "DNS propagation" is just caches expiring.</dd></div>
+        <div><dt>TLS</dt><dd>Encryption + integrity + authentication above TCP. The handshake negotiates keys (ECDHE — ephemeral, giving forward secrecy) and authenticates the server by certificate chain to a trusted CA. TLS 1.3: 1 RTT.</dd></div>
+        <div><dt>Certificates / PKI</dt><dd>A certificate binds a name to a public key, signed by a CA the client already trusts (chain to a root store). Wrong name, expired, or untrusted chain = the browser warning everyone clicks through in dev.</dd></div>
+        <div><dt>HTTP/1.1</dt><dd>Text protocol, one request at a time per connection (keep-alive reuses it). Browsers open ~6 parallel connections per host to fake concurrency — request-level HOL blocking otherwise.</dd></div>
+        <div><dt>HTTP/2</dt><dd>Binary framing multiplexes many streams over one TCP connection, plus header compression (HPACK). Kills request-level HOL — but one lost TCP packet still stalls <em>all</em> streams (transport-level HOL remains).</dd></div>
+        <div><dt>HTTP/3 / QUIC</dt><dd>Transport over UDP with streams that are independent at the transport level (a lost packet stalls only its stream), TLS 1.3 built in, 0/1-RTT setup, and connection migration across IP changes.</dd></div>
+        <div><dt>WebSocket / gRPC</dt><dd>WebSocket: upgrade an HTTP connection to full-duplex messaging (live updates, chat). gRPC: RPC over HTTP/2 with protobuf contracts and streaming — the typed service-to-service default.</dd></div>
+        <div><dt>Load balancer L4 vs L7</dt><dd>L4 spreads TCP connections by IP/port — fast, protocol-blind. L7 terminates HTTP(S): routes by path/host/header, retries, sticky sessions, TLS offload — smarter, costlier. Health checks eject dead backends.</dd></div>
+        <div><dt>NAT</dt><dd>Router rewrites private addresses/ports to a public one, keeping a translation table keyed by connection. Why "the same IP" serves a whole office, and why inbound connections need port forwarding or hole punching.</dd></div>
+        <div><dt>MTU</dt><dd>Maximum frame payload (~1500 bytes on Ethernet). Bigger IP packets fragment (or are dropped when DF is set — path MTU discovery relies on ICMP that firewalls love to block: silent black holes).</dd></div>
+        <div><dt>Latency vs bandwidth</dt><dd>Bandwidth buys throughput; the speed of light sets latency. A cross-ocean RTT is ~150 ms no matter the pipe — so protocols fight round trips (fewer handshakes, pipelining, caching, CDNs).</dd></div>
+        <div><dt>Tail latency</dt><dd>p99 matters more than mean: fan out to 100 backends and a 1%-slow straggler hits ~63% of requests. Fought with hedged requests, timeouts, and keeping queues short.</dd></div>
+      </dl>
+
+      <h3 class="sub">Core concepts</h3>
+      <div class="term-grid">
+        <article class="term-card"><h3>URL to pixels — the whole path</h3><p>Type a URL: DNS resolves (cache → recursive resolver → root/TLD/authoritative), TCP handshakes with the answer (1 RTT), TLS 1.3 handshakes (1 more RTT), the HTTP request goes out, a CDN edge or load balancer picks a backend, the response streams back, and the browser parses/renders as bytes arrive. Count round trips: on a 150 ms RTT path, cold connection setup alone is ~300 ms before byte one. That arithmetic explains most web performance engineering: connection reuse, session resumption/0-RTT, CDNs moving content near users, and QUIC folding transport+TLS into one round trip.</p></article>
+        <article class="term-card"><h3>How TCP makes IP reliable</h3><p>Every byte is numbered; the receiver acks the highest in-order byte received; the sender retransmits on timeout or on duplicate acks/SACK (fast retransmit). Delivery to the app is strictly in order — a lost segment means later segments wait in the kernel buffer until the hole fills (that's transport HOL blocking). Two independent throttles govern sending: the receiver's advertised window (flow control) and the congestion window (network protection); the effective window is the minimum. Teardown: FIN/ACK both ways, with TIME_WAIT lingering to absorb stragglers — why servers churning short connections exhaust ports.</p></article>
+        <article class="term-card"><h3>Congestion control intuition</h3><p>The network gives no capacity signal, so TCP probes: slow start doubles the congestion window every RTT until loss (or ECN mark), then backs off multiplicatively and settles into cautious additive growth — sawtooth around the fair share. Modern twists: CUBIC (default) grows by a cubic curve for fat pipes; BBR models bottleneck bandwidth and RTT instead of waiting for loss — better on lossy/long paths. Operational consequences: throughput ≈ window/RTT (long-RTT links need big windows), a cold connection is slow by design (slow start), and bufferbloat — oversized router buffers — turns "more buffering" into seconds of queueing latency.</p></article>
+        <article class="term-card"><h3>TLS 1.3 — what got fixed</h3><p>One round trip: ClientHello carries the key share (ECDHE) up front; the server answers with its share, certificate, and proof of key possession; both derive session keys and the client's first data rides the very next flight. Resumption can even send 0-RTT data (replayable — idempotent requests only). Forward secrecy is default: session keys come from ephemeral exchanges, so a later key compromise can't decrypt recorded traffic. Legacy weaknesses (static RSA, weak ciphers, renegotiation) were removed outright. Authentication still hinges on the certificate chain — and most real-world TLS failures are still expired or misnamed certs.</p></article>
+        <article class="term-card"><h3>The HOL-blocking arms race</h3><p>HTTP/1.1: one response at a time per connection — request-level HOL; browsers work around it with ~6 connections and devs with sprites/bundling. HTTP/2: multiplex streams over one connection — request-level HOL solved, but TCP's in-order bytestream means one lost packet stalls every stream (worse on lossy links than 6 separate connections!). HTTP/3/QUIC: streams are independent transport-level units over UDP — loss stalls only the affected stream. The pattern to remember: each generation moved the same bottleneck down a layer until the transport itself had to be replaced.</p></article>
+        <article class="term-card"><h3>Load balancing and tails</h3><p>L4 balancers push packets — millions of connections, no protocol smarts; L7 proxies terminate HTTP and route by content, retry failed backends, offload TLS, and emit the metrics you'll actually debug with. Algorithms matter under load: round-robin ignores slow backends; least-connections adapts; consistent hashing keeps caches warm and shuffles little when nodes churn. And tails dominate SLOs: if p99 = 500 ms and a page fans out to 50 services, most pages eat a p99 somewhere. Countermeasures — hedged requests after a delay, strict deadlines, load shedding — buy more UX than raising the mean ever will.</p></article>
+      </div>
+
+      <p class="diagram-title">TCP 3-way handshake and teardown</p>
+      <pre class="diagram">client                                server
+  │ ── SYN, seq=x ──────────────────▶ │   "let's talk, my numbering starts at x"
+  │ ◀─ SYN-ACK, seq=y, ack=x+1 ────── │   "mine starts at y, got yours"
+  │ ── ACK, ack=y+1 ────────────────▶ │   ESTABLISHED (1 RTT before data)
+  │ ══ data flows, every byte numbered and acked ══
+  │ ── FIN ─────────────────────────▶ │   each side closes independently
+  │ ◀─ ACK,  then FIN ─────────────── │
+  │ ── ACK ─────────────────────────▶ │
+  TIME_WAIT (client lingers ~60s to absorb stragglers —
+  port exhaustion trap for clients churning short connections)</pre>
+
+      <p class="diagram-title">TLS 1.3 handshake — one round trip, forward secret</p>
+      <pre class="diagram">client                                          server
+  │ ── ClientHello + key_share (ECDHE) ───────▶ │
+  │ ◀─ ServerHello + key_share,                 │  both sides now derive
+  │     {certificate, cert-verify, finished}─── │  session keys (ephemeral
+  │ ── {finished} + APPLICATION DATA ─────────▶ │  ECDHE ⇒ forward secrecy)
+        1 RTT to first byte (TLS 1.2 took 2)
+resumption: PSK ticket → 0-RTT early data (replayable! GETs only)
+server auth = cert chain → CA in client's root store;
+name mismatch / expiry = the failure you'll actually see in prod</pre>
+
+      <p class="diagram-title">DNS resolution — cache, then the hierarchy</p>
+      <pre class="diagram">browser → OS cache → stub resolver
+                        │ miss
+                        ▼
+              recursive resolver (ISP / 1.1.1.1 / 8.8.8.8)
+               │ cache miss? walk down:
+               ├─▶ root:          "ask .com" ──▶ NS
+               ├─▶ .com TLD:      "ask ns1.example-dns.com"
+               └─▶ authoritative: "shop.example.com A 203.0.113.7  TTL 300"
+                        │
+              cache for TTL, return address
+low TTL  = fast failover, constant queries
+high TTL = efficient, but changes crawl out as caches expire
+("propagation" is nothing but TTL expiry)</pre>
+
+      <p class="diagram-title">Head-of-line blocking across HTTP generations</p>
+      <pre class="diagram">HTTP/1.1 (per connection):   req A ──▶ resp A │ req B waits... │ resp B
+                             one slow response blocks the line (browsers: open 6)
+
+HTTP/2 (one TCP conn):       streams A,B,C interleaved ▓A▒B▓A░C▒B░C
+                             BUT packet loss ╳ → TCP holds ALL later bytes
+                             → every stream stalls (transport HOL)
+
+HTTP/3 (QUIC over UDP):      streams independent at transport
+                             ╳ hits stream B → A and C keep flowing
+                             + TLS built in, 1 RTT setup, 0-RTT resume,
+                               connection survives IP change (migration)</pre>
+
+      <div class="link-list">
+        <a href="https://hpbn.co/" target="_blank" rel="noopener">High Performance Browser Networking (free book)</a>
+        <a href="https://www.cloudflare.com/learning/ssl/what-happens-in-a-tls-handshake/" target="_blank" rel="noopener">TLS handshake explained — Cloudflare</a>
+        <a href="https://blog.cloudflare.com/http3-the-past-present-and-future/" target="_blank" rel="noopener">HTTP/3 and QUIC — Cloudflare blog</a>
+        <a href="https://research.google/pubs/pub40801/" target="_blank" rel="noopener">The Tail at Scale — Dean &amp; Barroso</a>
+      </div>
+
+      <h3 class="sub">Practice questions</h3>
+      <span class="sec-score" id="sec-score-net">Section score: 0 / 0</span>
+      <div class="quiz" data-section="net"></div>
+    </section>
+
+    <!-- ================= 5. INFRASTRUCTURE ================= -->
+    <section id="infra" class="section">
+      <h2>5. Infrastructure</h2>
+      <p class="section-note">
+        Running software as a fleet: containers and orchestration, infrastructure as code, CI/CD and safe
+        rollout strategies, the observability stack that tells you what production is doing, SLOs that
+        decide when to stop shipping, and the caching and queueing layers every architecture grows.
+      </p>
+
+      <h3 class="sub">Key terms</h3>
+      <dl class="def-list">
+        <div><dt>VM vs container</dt><dd>VM: hardware virtualized, each guest runs its own kernel — strong isolation, minutes to boot, GBs. Container: processes sharing the host kernel, isolated by namespaces + cgroups — starts in ms, MBs. Different trust boundaries.</dd></div>
+        <div><dt>Namespaces / cgroups</dt><dd>The two kernel features under containers: namespaces give a private view (PIDs, network, mounts, users); cgroups cap resources (CPU, memory — exceed the memory limit and the OOM killer visits).</dd></div>
+        <div><dt>Image / layers</dt><dd>A container image is a stack of immutable filesystem layers plus config. Layers are cached and shared: order your Dockerfile so rarely-changing steps (deps) precede frequently-changing ones (source) for fast rebuilds.</dd></div>
+        <div><dt>Registry / tags</dt><dd>Images live in registries, pulled by tag or digest. Tags are mutable pointers — <code>:latest</code> today isn't <code>:latest</code> tomorrow; deploy by digest or immutable version tags for reproducibility.</dd></div>
+        <div><dt>Kubernetes</dt><dd>Declarative container orchestrator: you write desired state, controllers reconcile reality toward it — scheduling, restarts, scaling, rollouts. The API server + etcd hold the cluster's truth.</dd></div>
+        <div><dt>Pod</dt><dd>Smallest deployable unit: one or more tightly-coupled containers sharing network namespace (localhost) and volumes. Pods are cattle — they die and are replaced, never repaired.</dd></div>
+        <div><dt>Deployment / ReplicaSet</dt><dd>Deployment declares "N replicas of this pod template" and manages rolling updates between versions; the ReplicaSet keeps the replica count true at each version.</dd></div>
+        <div><dt>Service / Ingress</dt><dd>Service: stable virtual IP/DNS name load-balancing over healthy pods selected by label (pod IPs churn constantly). Ingress/Gateway: HTTP routing from outside — host/path → Service, TLS termination.</dd></div>
+        <div><dt>Liveness / readiness probes</dt><dd>Liveness: "restart me if this fails" (hung process). Readiness: "don't route traffic to me yet" (warming up, draining). Confusing them causes restart loops or black-holed requests.</dd></div>
+        <div><dt>Requests / limits</dt><dd>Request: what the scheduler reserves for the pod. Limit: hard cap (CPU throttled at limit; memory OOM-killed). The gap between them is overcommit — and your noisy-neighbor exposure.</dd></div>
+        <div><dt>IaC (Terraform etc.)</dt><dd>Infrastructure declared in versioned code, applied by a tool that diffs desired vs actual state (plan → apply). Reviewable, repeatable, revertable — the opposite of console click-ops and snowflake servers.</dd></div>
+        <div><dt>CI/CD</dt><dd>CI: every push builds and tests automatically. CD: artifacts flow to environments through an automated, gated pipeline. Small frequent deploys beat big-bang releases on every reliability metric.</dd></div>
+        <div><dt>Blue-green</dt><dd>Two full environments; switch traffic atomically to the new one and keep the old warm for instant rollback. Simple, fast to revert, doubles infrastructure during the swap.</dd></div>
+        <div><dt>Canary</dt><dd>Route a small slice (1–5%) of real traffic to the new version, compare error/latency metrics against the fleet, then ramp or roll back. Limits blast radius; needs good metrics to judge the verdict.</dd></div>
+        <div><dt>Feature flag</dt><dd>Deploy code dark, enable per user/percent at runtime, kill instantly without a deploy. Decouples deploy from release; flags need cleanup or they become permanent config debt.</dd></div>
+        <div><dt>Logs / metrics / traces</dt><dd>The three signals: structured logs (what happened, searchable), metrics (cheap numeric time series — rates, latencies, saturation — what you alert on), traces (one request's path across services with per-hop timing).</dd></div>
+        <div><dt>SLI / SLO / error budget</dt><dd>SLI: measured indicator (p99 latency, success rate). SLO: target (99.9% monthly). Error budget: the allowed 0.1% — spend it shipping fast; exhausted budget pauses features for reliability work.</dd></div>
+        <div><dt>Autoscaling</dt><dd>Horizontal: add/remove replicas on load (needs stateless-ish services). Vertical: resize instances. Reactive scaling lags spikes — keep headroom; scale on leading indicators (queue depth, RPS) not just CPU.</dd></div>
+        <div><dt>Message queue / pub-sub</dt><dd>Queue (SQS, RabbitMQ): each message consumed by one worker — decouple, absorb bursts, retry with DLQ. Log/pub-sub (Kafka): append-only, many independent consumer groups replay at their own pace.</dd></div>
+        <div><dt>Cache (Redis / CDN)</dt><dd>Serve hot data from memory/edge instead of recomputing: cache-aside with TTLs is the workhorse. The hard parts: invalidation, stampedes on hot-key expiry, and cold-cache thundering herds after deploys.</dd></div>
+        <div><dt>Secrets management</dt><dd>Credentials in a vault (Vault, cloud secret managers), injected at runtime, rotated, audited — never in git, images, or env files. Prefer short-lived credentials and workload identity over static keys.</dd></div>
+      </dl>
+
+      <h3 class="sub">Core concepts</h3>
+      <div class="term-grid">
+        <article class="term-card"><h3>Containers are processes</h3><p>A container is not a lightweight VM — it's a normal Linux process wearing namespaces (private PID/network/mount view) and cgroups (resource caps), rooted in an image's layered filesystem. That's why it starts in milliseconds, why all containers on a host share one kernel (kernel exploit = shared blast radius; use VMs/gVisor across hostile tenants), and why "works in the container" is mostly "the filesystem is pinned". Images build reproducibly in layers — order Dockerfile steps by change frequency, keep images minimal (distroless: smaller pulls, smaller CVE surface), and never bake secrets into a layer: layers are forever.</p></article>
+        <article class="term-card"><h3>Kubernetes = reconciliation</h3><p>Everything in Kubernetes is one idea: desired state lives in etcd, controllers watch it and nudge reality toward it, forever. You don't "run a pod" — you declare a Deployment of 3 replicas; the controller notices 2 exist and starts one, notices a node died and reschedules, notices a new image and rolls pods gradually behind a Service that only routes to ready ones. Self-healing falls out of the loop, not from any special feature. The operational corollary: never hand-edit live objects (the controller reverts you, or worse, GitOps drifts) — change the declaration, let the loop do the work.</p></article>
+        <article class="term-card"><h3>Rollouts that fail safely</h3><p>Assume some deploys are bad; choose how you find out. Rolling update: gradual, cheap, but old and new coexist — every schema and API change must be backward compatible for the overlap. Blue-green: atomic cutover, instant rollback, double cost. Canary: a metric-judged slice of real traffic — the best failure detector, if your dashboards can actually tell good from bad. Underneath all three: expand-contract for databases (add column → dual-write/migrate → cut over → drop later; never break the running version) and feature flags so risky code ships dark and turns off faster than any rollback.</p></article>
+        <article class="term-card"><h3>Observability is for unknowns</h3><p>Monitoring answers "is it broken?" — observability answers "why?", including failures you never predicted. Metrics are the cheap always-on layer: RED (rate, errors, duration) per service, USE (utilization, saturation, errors) per resource; alert on symptoms users feel (SLO burn rate), not on every twitching cause. Traces stitch one request across twenty services and point at the slow hop; logs carry the detail, joined to traces by correlation IDs. The discipline that makes it work: instrument at the edges, propagate context, sample intelligently — and delete alerts nobody acts on, because a noisy pager is an untrusted pager.</p></article>
+        <article class="term-card"><h3>SLOs make reliability a number</h3><p>Pick an SLI users feel (successful requests under 300 ms), set a target you can defend (99.9%), and the complement becomes an error budget: ~43 minutes of violation per month. Now decisions stop being vibes: budget left → ship features; budget burned → freeze launches and fix reliability, by prior agreement with product. Alerts follow burn <em>rate</em> — "at this pace the month's budget dies in 6 hours" pages someone; a slow leak makes a ticket. 100% is not a target: the last nine costs more than users notice, and a small budget deliberately spent (chaos drills, risky migrations) buys learning.</p></article>
+        <article class="term-card"><h3>Queues and caches, honestly</h3><p>A queue decouples: producers absorb bursts, consumers scale on backlog, retries with dead-letter queues contain poison messages — at the price of eventual consistency and duplicate delivery (consumers must be idempotent; monitor queue age, not just depth). A cache buys latency: cache-aside with TTL serves most needs, but plan for the failure modes — stampede when a hot key expires (locking or early refresh), inconsistency windows after writes (invalidate, don't update-in-place), and the cold-start herd after a flush. Both share a law: they hide load problems until the day they amplify them — capacity-plan for the cache-miss path, not the hit path.</p></article>
+      </div>
+
+      <p class="diagram-title">VM vs container — where the boundary sits</p>
+      <pre class="diagram">        VMs                                  containers
+┌─────────┐ ┌─────────┐              ┌───────┐ ┌───────┐ ┌───────┐
+│ app     │ │ app     │              │ app   │ │ app   │ │ app   │
+│ libs    │ │ libs    │              │ libs  │ │ libs  │ │ libs  │
+│ GUEST   │ │ GUEST   │              └───┬───┘ └───┬───┘ └───┬───┘
+│ KERNEL  │ │ KERNEL  │              namespaces (private view) +
+└────┬────┘ └────┬────┘              cgroups (CPU/mem caps)
+   hypervisor (virtual hardware)     ┌────────────────────────────┐
+┌───────────────────────────┐        │      ONE shared kernel     │
+│       host / hardware     │        └────────────────────────────┘
+└───────────────────────────┘
+boot: minutes vs milliseconds; size: GBs vs MBs
+isolation: hardware-strong vs kernel-shared (hostile tenants → VMs,
+           gVisor/Firecracker = middle ground)</pre>
+
+      <p class="diagram-title">Kubernetes — request path and reconcile loop</p>
+      <pre class="diagram">user ──▶ Ingress ──▶ Service (stable VIP, label selector)
+                        │ routes only to READY pods
+             ┌──────────┼──────────┐
+          [pod v2]   [pod v2]   [pod v2]   ← Deployment: "3 replicas of v2"
+             ▲
+   reconcile loop (the whole trick):
+   ┌──────────────────────────────────────────────┐
+   │ desired (etcd): 3 × v2                       │
+   │ observed:       2 × v2 (node died)           │
+   │ controller: start 1 pod → observe → repeat   │
+   └──────────────────────────────────────────────┘
+rolling update = new RS scales 0→3 while old RS 3→0, gated by
+readiness probes.  liveness restarts hung pods; readiness gates traffic.</pre>
+
+      <p class="diagram-title">Canary rollout — blast radius under control</p>
+      <pre class="diagram">                        ┌─▶ v1  (95%)  ──┐
+traffic ──▶ router ─────┤                ├──▶ compare: error rate,
+                        └─▶ v2  ( 5%)  ──┘    p99 latency, saturation
+                              │
+              metrics healthy for N min?
+              ├─ yes → ramp 25% → 50% → 100%   (v1 drains away)
+              └─ no  → route 100% back to v1 — only 5% ever saw it
+prereqs: real metrics per version (RED), auto-rollback thresholds,
+backward-compatible schema (v1 and v2 run side by side!)
+blue-green = the all-at-once cousin: full v2 env, atomic switch,
+instant rollback, 2× cost during the swap</pre>
+
+      <p class="diagram-title">Where reads get answered — the caching ladder</p>
+      <pre class="diagram">client ─▶ CDN edge ─▶ LB ─▶ app ─▶ Redis ─▶ database
+           │ hit? done        │ hit? done     │ the only copy that's TRUE
+           ~10ms global       ~1ms            ~10ms + real work
+cache-aside:  read: hit? return : fetch DB → set(TTL) → return
+              write: write DB → INVALIDATE key (don't update-in-place)
+failure modes to design for:
+  stampede: hot key expires → 1000 misses hit DB at once
+            (fix: per-key lock / stale-while-revalidate / jittered TTL)
+  cold start after deploy/flush → thundering herd
+  capacity: plan for the MISS path — the cache will lie to you until then</pre>
+
+      <div class="link-list">
+        <a href="https://kubernetes.io/docs/concepts/" target="_blank" rel="noopener">Kubernetes concepts — official docs</a>
+        <a href="https://sre.google/sre-book/table-of-contents/" target="_blank" rel="noopener">Google SRE book (free online)</a>
+        <a href="https://12factor.net/" target="_blank" rel="noopener">The Twelve-Factor App</a>
+        <a href="https://martinfowler.com/bliki/CanaryRelease.html" target="_blank" rel="noopener">Canary release — Martin Fowler</a>
+      </div>
+
+      <h3 class="sub">Practice questions</h3>
+      <span class="sec-score" id="sec-score-infra">Section score: 0 / 0</span>
+      <div class="quiz" data-section="infra"></div>
+    </section>
+
+    <!-- ================= RESOURCES ================= -->
+    <section id="resources" class="section">
+      <h2>Further Study</h2>
+      <div class="source-grid">
+        <article class="term-card">
+          <h3>Books</h3>
+          <p>"Designing Data-Intensive Applications" (Kleppmann) covers databases and distributed systems better than anything else; "Operating Systems: Three Easy Pieces" (free online) for OS/concurrency; "Computer Networking: A Top-Down Approach" (Kurose &amp; Ross) for networking; "Site Reliability Engineering" (free from Google) for infra and SLOs.</p>
+        </article>
+        <article class="term-card">
+          <h3>Hands-on drills</h3>
+          <p>EXPLAIN a slow query and fix it with one index. Write a program with a deliberate race, catch it with a thread sanitizer, fix it with an atomic. Kill the leader of a 3-node Raft cluster (etcd) and watch re-election. Capture a TCP+TLS handshake in Wireshark. Roll out a bad deploy behind a canary and watch it get caught.</p>
+        </article>
+        <article class="term-card">
+          <h3>Reference sites</h3>
+          <p>Postgres docs are the best database textbook that pretends to be documentation. man7.org for Linux syscalls. The Raft paper and raft.github.io visualization. Cloudflare's blog for networking deep dives; the Google SRE book online for infra practice.</p>
+        </article>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <p>Last updated: 2026-07-04. Styles shared with the Isaac Sim study hub.</p>
+  </footer>
+
+<script src="quiz-data.js"></script>
+<script>
+const state = {};
+
+function el(tag, className, text) {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text) node.textContent = text;
+  return node;
+}
+
+function shuffle(arr) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function totals() {
+  let answered = 0, correct = 0, total = 0;
+  for (const key of Object.keys(state)) {
+    answered += state[key].answered;
+    correct += state[key].correct;
+    total += state[key].total;
+  }
+  return { answered, correct, total };
+}
+
+function updateScore() {
+  const t = totals();
+  document.getElementById("score-text").textContent = `Score: ${t.correct} / ${t.answered}`;
+  document.getElementById("score-note").textContent =
+    t.answered === t.total
+      ? `Done! ${t.correct} of ${t.total} correct (${Math.round(100 * t.correct / t.total)}%). Retry to reshuffle questions and options.`
+      : `${t.total - t.answered} of ${t.total} questions remaining across 5 sections.`;
+  for (const key of Object.keys(state)) {
+    const s = state[key];
+    const elScore = document.getElementById(`sec-score-${key}`);
+    if (elScore) {
+      elScore.textContent = s.answered === s.total
+        ? `Section score: ${s.correct} / ${s.total} (${Math.round(100 * s.correct / s.total)}%)`
+        : `Section score: ${s.correct} / ${s.answered} — ${s.total - s.answered} left`;
+    }
+  }
+}
+
+function renderQuestion(container, item, number, sectionKey) {
+  if (item.type === "multi") return renderMulti(container, item, number, sectionKey);
+  if (item.type === "order") return renderOrder(container, item, number, sectionKey);
+  const card = el("article", "quiz-card");
+  card.appendChild(el("p", "q", `Q${number}. ${item.q}`));
+  const optionsBox = el("div", "options");
+  const explain = el("div", "explain");
+  explain.appendChild(document.createTextNode(item.explain));
+
+  const buttons = [];
+  for (const [text, isCorrect] of shuffle(item.options)) {
+    const btn = el("button", "", text);
+    btn.type = "button";
+    btn.dataset.correct = isCorrect ? "1" : "0";
+    btn.addEventListener("click", () => {
+      state[sectionKey].answered += 1;
+      if (isCorrect) state[sectionKey].correct += 1;
+      for (const b of buttons) {
+        b.disabled = true;
+        if (b.dataset.correct === "1") b.classList.add("correct");
+      }
+      if (!isCorrect) btn.classList.add("incorrect");
+      const verdict = el("span", "verdict " + (isCorrect ? "good" : "bad"), isCorrect ? "Correct. " : "Incorrect. ");
+      explain.insertBefore(verdict, explain.firstChild);
+      explain.classList.add("show");
+      updateScore();
+    });
+    buttons.push(btn);
+    optionsBox.appendChild(btn);
+  }
+
+  card.appendChild(optionsBox);
+  card.appendChild(explain);
+  container.appendChild(card);
+}
+
+function renderMulti(container, item, number, sectionKey) {
+  const card = el("article", "quiz-card");
+  const title = el("p", "q", `Q${number}. ${item.q}`);
+  title.appendChild(el("span", "qtype-tag", "select ALL that apply"));
+  card.appendChild(title);
+  const optionsBox = el("div", "options");
+  const explain = el("div", "explain");
+  explain.appendChild(document.createTextNode(item.explain));
+
+  const buttons = [];
+  for (const [text, isCorrect] of shuffle(item.options)) {
+    const btn = el("button", "", text);
+    btn.type = "button";
+    btn.dataset.correct = isCorrect ? "1" : "0";
+    btn.addEventListener("click", () => btn.classList.toggle("selected"));
+    buttons.push(btn);
+    optionsBox.appendChild(btn);
+  }
+
+  const check = el("button", "check-btn", "Check answer");
+  check.type = "button";
+  check.addEventListener("click", () => {
+    state[sectionKey].answered += 1;
+    let ok = true;
+    for (const b of buttons) {
+      const good = b.dataset.correct === "1";
+      const picked = b.classList.contains("selected");
+      if (good !== picked) ok = false;
+      b.disabled = true;
+      if (good) b.classList.add("correct");
+      else if (picked) b.classList.add("incorrect");
+    }
+    if (ok) state[sectionKey].correct += 1;
+    check.disabled = true;
+    const verdict = el("span", "verdict " + (ok ? "good" : "bad"),
+      ok ? "Correct — exact set matched. " : "Incorrect — the full correct set is highlighted green. ");
+    explain.insertBefore(verdict, explain.firstChild);
+    explain.classList.add("show");
+    updateScore();
+  });
+
+  card.appendChild(optionsBox);
+  card.appendChild(check);
+  card.appendChild(explain);
+  container.appendChild(card);
+}
+
+function renderOrder(container, item, number, sectionKey) {
+  const card = el("article", "quiz-card");
+  const title = el("p", "q", `Q${number}. ${item.q}`);
+  title.appendChild(el("span", "qtype-tag", "click the steps in order"));
+  card.appendChild(title);
+  const optionsBox = el("div", "options");
+  const explain = el("div", "explain");
+  explain.appendChild(document.createTextNode(
+    item.explain + " Correct order: " + item.steps.map((s, i) => `(${i + 1}) ${s}`).join(" → ") + "."));
+
+  const seq = [];
+  const check = el("button", "check-btn", "Check order");
+  check.type = "button";
+  check.disabled = true;
+
+  const buttons = shuffle(item.steps.map((text, idx) => ({ text, idx }))).map(step => {
+    const btn = el("button", "step-btn");
+    btn.type = "button";
+    const badge = el("span", "step-badge", "");
+    badge.style.visibility = "hidden";
+    btn.appendChild(badge);
+    btn.appendChild(el("span", "", step.text));
+    btn.dataset.idx = String(step.idx);
+    btn.addEventListener("click", () => {
+      const pos = seq.indexOf(btn);
+      if (pos >= 0) seq.splice(pos, 1); else seq.push(btn);
+      for (const b of buttons) {
+        const p = seq.indexOf(b);
+        const bd = b.querySelector(".step-badge");
+        bd.textContent = p >= 0 ? String(p + 1) : "";
+        bd.style.visibility = p >= 0 ? "visible" : "hidden";
+        b.classList.toggle("selected", p >= 0);
+      }
+      check.disabled = seq.length !== buttons.length;
+    });
+    optionsBox.appendChild(btn);
+    return btn;
+  });
+
+  check.addEventListener("click", () => {
+    state[sectionKey].answered += 1;
+    let ok = true;
+    seq.forEach((btn, pos) => {
+      const right = Number(btn.dataset.idx) === pos;
+      if (!right) ok = false;
+      btn.classList.add(right ? "correct" : "incorrect");
+    });
+    for (const b of buttons) b.disabled = true;
+    if (ok) state[sectionKey].correct += 1;
+    check.disabled = true;
+    const verdict = el("span", "verdict " + (ok ? "good" : "bad"),
+      ok ? "Correct sequence. " : "Wrong sequence — green steps were in the right position, amber ones were not. ");
+    explain.insertBefore(verdict, explain.firstChild);
+    explain.classList.add("show");
+    updateScore();
+  });
+
+  card.appendChild(optionsBox);
+  card.appendChild(check);
+  card.appendChild(explain);
+  container.appendChild(card);
+}
+
+function renderAll() {
+  for (const quizBox of document.querySelectorAll(".quiz")) {
+    const key = quizBox.dataset.section;
+    state[key] = { answered: 0, correct: 0, total: 0 };
+    quizBox.innerHTML = "";
+    const items = shuffle(quizData[key]);
+    items.forEach((item, i) => {
+      state[key].total += 1;
+      renderQuestion(quizBox, item, i + 1, key);
+    });
+  }
+  updateScore();
+}
+
+const toggleBtn = document.getElementById("toggle-explain");
+toggleBtn.addEventListener("click", () => {
+  const on = document.getElementById("main").classList.toggle("show-all");
+  toggleBtn.textContent = on ? "Hide explanations" : "Show all explanations";
+});
+
+document.getElementById("retry").addEventListener("click", renderAll);
+renderAll();
+</script>
+</body>
+</html>
