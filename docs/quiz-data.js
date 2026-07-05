@@ -1,7 +1,8 @@
 // Quiz bank for systems-skills.html.
 // Format: quizData.{db,os,dist,net,infra} = [{ q, options: [[text, isCorrect]...], explain }]
 // Question types: default single-answer; type:"multi" (exact-set multi-select);
-// type:"order" ({ steps: [...] } in correct order, shuffled for display).
+// type:"order" ({ steps: [...] } in correct order, shuffled for display);
+// type:"code" ({ code: "..." } snippet with ____ blank; single-answer completions).
 const quizData = {
   db: [
     {
@@ -192,6 +193,30 @@ const quizData = {
         ["Add more shards until the large tenant's share per shard is acceptable", false]
       ],
       explain: "Hashing distributes keys, not the load within one key: tenant_id routes the whole whale to one shard no matter the function, and adding shards just shrinks everyone else's slice. Sharding by row ID spreads the load but destroys tenant locality — every query fans out to all shards and per-tenant isolation/compliance gets harder. Real systems handle whales with placement policy (dedicated shards, resource isolation) plus a second-level partition key inside the tenant. The lesson: partition-key design is workload analysis, and heavy-hitter skew is a first-class constraint, not an afterthought."
+    },
+    {
+      type: "code",
+      q: "The report must list EVERY customer with their order count — including customers who have never ordered (count 0). Which aggregate completes it correctly?",
+      code: "SELECT c.id, c.name, ____ AS order_count\nFROM customers c\nLEFT JOIN orders o ON o.customer_id = c.id\nGROUP BY c.id, c.name;",
+      options: [
+        ["COUNT(o.id)", true],
+        ["COUNT(*)  (counts the customer's row itself — zero-order customers show 1)", false],
+        ["SUM(o.customer_id)", false],
+        ["COUNT(DISTINCT c.id)  (always 1 per group)", false]
+      ],
+      explain: "With a LEFT JOIN, customers without orders still produce one row — with the order columns NULL. COUNT(*) counts rows, so those customers report 1; COUNT(o.id) counts non-NULL values, correctly giving 0. This COUNT(*)-vs-COUNT(column) distinction is the classic LEFT JOIN aggregation trap, and it silently inflates metrics rather than erroring."
+    },
+    {
+      type: "code",
+      q: "The application must not see non-repeatable reads, at the LOWEST isolation level that prevents them. What completes the statement?",
+      code: "SET TRANSACTION ISOLATION LEVEL ____;\nBEGIN;\nSELECT balance FROM accounts WHERE id = 42;\n-- ... later in the same transaction, the same SELECT\n-- must be guaranteed to return the same value\nCOMMIT;",
+      options: [
+        ["REPEATABLE READ", true],
+        ["READ COMMITTED  (each statement sees freshly committed data — the value can change between the two reads)", false],
+        ["READ UNCOMMITTED", false],
+        ["SERIALIZABLE  (prevents them too, but is not the lowest such level)", false]
+      ],
+      explain: "The isolation ladder: READ UNCOMMITTED allows dirty reads; READ COMMITTED stops dirty reads but re-reads can differ (non-repeatable); REPEATABLE READ pins the rows you read for the transaction's duration — the requirement here; SERIALIZABLE additionally stops phantoms at the highest cost. Knowing which anomaly each level eliminates lets you buy exactly the consistency you need."
     }
   ],
   os: [
@@ -383,6 +408,30 @@ const quizData = {
         ["At the OS scheduler — the process needs a higher priority", false]
       ],
       explain: "The tell is correlation: a pool or network problem would hit endpoints that use those resources, but a health check that touches nothing stalls only if the shared loop thread itself is busy. A 2-second synchronous computation (or GC pause in other runtimes) freezes every queued callback, then everything drains at once — exactly the observed shape. Event-loop lag is the metric that would have paged you. The transferable skill: 'everything stalls together' points at the shared execution resource, not at any individual dependency."
+    },
+    {
+      type: "code",
+      q: "The cron job's log must capture everything the script prints — normal output AND errors. What completes the redirection?",
+      code: "#!/bin/sh\n/opt/app/nightly-report.sh > /var/log/report.log ____",
+      options: [
+        ["2>&1", true],
+        ["&2>1", false],
+        ["2>>&1", false],
+        ["| stderr", false]
+      ],
+      explain: "'2>&1' means 'point file descriptor 2 (stderr) at wherever descriptor 1 (stdout) currently goes' — and order matters: it must come AFTER the > redirection, or stderr is pointed at the old stdout (the terminal). The other spellings are invalid shell. This idiom (or its shorthand '&>' in bash) is the difference between a log that explains the 3am failure and one that ends mid-sentence."
+    },
+    {
+      type: "code",
+      q: "A consumer thread waits for items. Which argument completes the condition-variable wait correctly?",
+      code: "pthread_mutex_lock(&mu);\nwhile (queue_is_empty(&q)) {\n    pthread_cond_wait(&cv, ____);\n}\nitem = queue_pop(&q);\npthread_mutex_unlock(&mu);",
+      options: [
+        ["&mu  (the mutex protecting the queue — wait atomically releases it while sleeping and re-acquires it before returning)", true],
+        ["NULL", false],
+        ["&cv", false],
+        ["&q", false]
+      ],
+      explain: "pthread_cond_wait takes the locked mutex guarding the shared state: it atomically releases the mutex and sleeps, then re-acquires it before waking — closing the race where the producer signals between your emptiness check and your sleep. The surrounding while (not if) re-checks the predicate against spurious wakeups and competing consumers. Passing NULL or the wrong object is undefined behavior."
     }
   ],
   dist: [
@@ -574,6 +623,30 @@ const quizData = {
         ["Whether to lower the databases' isolation levels so cross-service transactions run faster", false]
       ],
       explain: "The expensive mistake is accepting the problem as stated: 'we need a distributed transaction' often means 'a service boundary cut through an invariant.' Redrawing the boundary turns a distributed-systems problem into a SQL BEGIN/COMMIT. When the boundary is genuinely fixed (org, scale, vendor), sagas with compensations and explicit pending states are the workable pattern, with the business accepting 'paid then refunded' windows. Broker delivery guarantees don't create cross-service atomicity, and 2PC's blocking failure mode is precisely why it rarely crosses service boundaries. Architecture first, mechanism second."
+    },
+    {
+      type: "code",
+      q: "The client retries this request on timeout, but the payment must never be charged twice. Which header completes the safe-retry pattern?",
+      code: "POST /v1/payments HTTP/1.1\nHost: api.example.com\nContent-Type: application/json\n____: 7f3d9a2e-order-4411\n\n{\"amount\": 4999, \"currency\": \"USD\"}",
+      options: [
+        ["Idempotency-Key", true],
+        ["Retry-After  (a response header — tells clients how long to wait)", false],
+        ["ETag  (cache validation, not request deduplication)", false],
+        ["Cache-Control: no-store", false]
+      ],
+      explain: "A timeout is ambiguous: the server may have processed the charge and lost only the response. An idempotency key lets the server recognize the retry as the SAME logical operation and return the stored first result instead of charging again — the standard pattern (Stripe et al.) for unsafe operations behind retries. The other headers govern caching and backoff, not deduplication; the server must also persist key→result atomically with the side effect."
+    },
+    {
+      type: "code",
+      q: "The cluster has 5 nodes and must keep accepting writes while any 2 are down. Which quorum size completes the config?",
+      code: "# consensus cluster configuration\ncluster_size: 5\nwrite_quorum: ____   # replicas that must acknowledge each write",
+      options: [
+        ["3  (a majority: any two quorums overlap, and it tolerates 2 failures)", true],
+        ["2  (two disjoint groups of 2 could both accept conflicting writes)", false],
+        ["5  (consistent, but a single failure halts all writes)", false],
+        ["1", false]
+      ],
+      explain: "Majority quorum = floor(n/2)+1 = 3 of 5: any two majorities share at least one node, so two conflicting writes can never both be acknowledged, and the cluster survives n − quorum = 2 failures. Quorum 2 allows split brain (2+2 with one node down); quorum 5 makes every node a single point of failure for availability. The same arithmetic is why consensus clusters have odd sizes — 6 nodes tolerate no more failures than 5."
     }
   ],
   net: [
@@ -765,6 +838,30 @@ const quizData = {
         ["TLS tickets expire at 60s, forcing failed resumptions", false]
       ],
       explain: "Between the backend's FIN and the LB noticing, there's a window where the LB fires a request into a dying connection — and idle windows that long only occur at low traffic, explaining the inverted correlation. The rule that generalizes across every proxy chain (CDN → LB → sidecar → app): each hop's idle timeout must exceed its downstream caller's, so the entity that owns connection reuse is always the one that closes. Nothing is 'failing,' which is why backend logs are clean; the bug lives in the interaction of two individually-correct configurations — precisely where principal-level networking problems hide."
+    },
+    {
+      type: "code",
+      q: "www must follow wherever the app host points, without duplicating its IP. Which record type completes the DNS zone?",
+      code: "; example.com zone file\napp.example.com.    300  IN  A      203.0.113.10\nwww.example.com.    300  IN  ____   app.example.com.",
+      options: [
+        ["CNAME  (alias to another name — resolvers chase it to app's A record)", true],
+        ["A  (requires an IP address, not a hostname — and duplicates it)", false],
+        ["MX  (mail routing)", false],
+        ["TXT", false]
+      ],
+      explain: "CNAME says 'this name is an alias for that name': when app's IP changes, www follows automatically because resolvers restart resolution at the target. An A record would hard-code the IP in two places — the drift bug CNAME exists to prevent. Constraint worth knowing: a CNAME cannot coexist with other records at the same name, which is why zone apexes (example.com itself) need A/ALIAS instead."
+    },
+    {
+      type: "code",
+      q: "The CDN should cache this static asset for an hour, and shared caches may store it. Which directive completes the response?",
+      code: "HTTP/1.1 200 OK\nContent-Type: text/css\nCache-Control: ____\n\n/* app.css ... */",
+      options: [
+        ["public, max-age=3600", true],
+        ["no-store  (forbids caching entirely)", false],
+        ["private, max-age=3600  (browser may cache; CDN and shared caches may NOT)", false],
+        ["must-revalidate  (alone, gives no freshness lifetime to revalidate against)", false]
+      ],
+      explain: "'public' permits shared caches (CDNs, proxies) to store the response; 'max-age=3600' declares it fresh for an hour, during which caches serve it without contacting the origin. 'private' restricts storage to the end user's browser — right for personalized pages, wrong for shared assets. In production this pairs with content-hashed filenames (app.9f3c2.css) so 'an hour' can safely become 'a year, immutable.'"
     }
   ],
   infra: [
@@ -956,6 +1053,30 @@ const quizData = {
         ["Autoscaling was correct to do nothing, since the pods weren't out of CPU", false]
       ],
       explain: "The HPA behaved exactly as configured and exactly wrongly: the saturated resource was concurrency slots, not CPU, so its input carried no information about the bottleneck. Worse, blindly adding replicas during a downstream brownout amplifies the pressure — sometimes the right response is shedding load, not scaling. Tuning the wrong signal harder (20% target) buys noise, and max-replicas-always abandons elasticity instead of fixing observability. The principal-level takeaway spans systems: control loops are only as good as the signal they observe, and capacity decisions must model where the queue actually forms."
+    },
+    {
+      type: "code",
+      q: "If the app deadlocks (process alive, but /healthz stops answering), Kubernetes must RESTART the container. Which field completes the spec?",
+      code: "containers:\n- name: api\n  image: registry/api:1.4.2\n  ____:\n    httpGet: { path: /healthz, port: 8080 }\n    periodSeconds: 10\n    failureThreshold: 3",
+      options: [
+        ["livenessProbe  (failure ⇒ kill and restart the container)", true],
+        ["readinessProbe  (failure ⇒ remove from Service endpoints — no restart)", false],
+        ["startupProbe  (only gates the other probes during boot)", false],
+        ["lifecycle", false]
+      ],
+      explain: "Liveness failures restart the container — the remedy for hung-but-running processes. Readiness failures only pull the pod out of load balancing, which is right for temporary conditions (warming up, dependency down) where a restart would make things worse. Mixing them up is a classic outage amplifier: a liveness probe that checks a dependency turns that dependency's blip into a cluster-wide restart storm."
+    },
+    {
+      type: "code",
+      q: "Rebuilding this image should NOT re-run npm ci when only application source changed. Which COPY completes the Dockerfile for correct layer caching?",
+      code: "FROM node:20-slim\nWORKDIR /app\nCOPY ____ ./\nRUN npm ci\nCOPY . .\nCMD [\"node\", \"server.js\"]",
+      options: [
+        ["package.json package-lock.json", true],
+        [".  (any source change invalidates the layer — npm ci runs every build)", false],
+        ["src/", false],
+        ["node_modules/  (copying host modules defeats the reproducible install)", false]
+      ],
+      explain: "Docker reuses a cached layer only if every prior layer and the copied files are unchanged. Copying just the dependency manifests first means the expensive npm ci layer is invalidated only when dependencies actually change; day-to-day source edits hit the cache and rebuild in seconds. COPY . . first is the most common Dockerfile performance mistake; copying node_modules imports host-platform artifacts and skips the lockfile guarantee."
     }
   ]
 };

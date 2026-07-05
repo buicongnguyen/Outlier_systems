@@ -53,6 +53,8 @@
     .bar-btn.secondary:hover { border-color:var(--accent); color:var(--accent-strong); background:var(--accent-soft); }
     .source-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:12px; }
     .source-grid article { padding:14px; margin-bottom:0; }
+    .quiz-card .snippet { margin:0 0 12px; font-size:13px; }
+    .quiz-card .snippet .blank { color:var(--warn); font-weight:700; }
   </style>
 </head>
 <body>
@@ -80,8 +82,10 @@
         five areas: databases and storage, operating systems with concurrency and runtimes, distributed
         systems, networking, and infrastructure. Each section has a definitions list, core-concept cards
         with tradeoffs and pitfalls, ASCII diagrams where a picture helps, further-reading links, and a
-        bank of practice questions with explanations in three formats: single-answer, select-all-that-apply,
-        and ordering chains. Difficulty runs from recall up to applied reasoning; questions tagged
+        bank of practice questions with explanations in four formats: single-answer, select-all-that-apply,
+        ordering chains, and complete-the-code — a short query, script, or config with a piece missing,
+        where you pick the line that correctly completes it. Difficulty runs from recall up to applied
+        reasoning; questions tagged
         <em>senior+</em> target senior/principal-level judgment — production diagnosis from ambiguous
         symptoms, architecture tradeoffs under real constraints, and postmortem reasoning.
       </p>
@@ -204,6 +208,20 @@ both commit under snapshot isolation — combined result violates the
 invariant both checked. fix: SERIALIZABLE or SELECT ... FOR UPDATE.
 (* Postgres RR blocks phantoms; InnoDB RR mostly via gap locks)</pre>
 
+      <p class="diagram-title">Replication lag — the read-your-own-writes sequence</p>
+      <pre class="diagram">app                    primary                 replica (async)
+ │ UPDATE profile ────▶ │
+ │ ◀── COMMIT ok ────── │
+ │                      │── ship WAL ─────────▶ │   lag: ms … seconds
+ │ GET /profile ────────┼───────────────────────▶│   (read routed to replica)
+ │ ◀── OLD row ─────────┼─────────────────────── │   not applied yet!
+ │  "my edit vanished"  │        ...             │
+ │                      │── apply WAL ─────────▶ │   now consistent — too late
+
+fixes: pin this user's reads to the primary briefly after a write,
+or hold the write's LSN in the session and only read from replicas
+that have applied it, or accept staleness where the product allows.</pre>
+
       <div class="link-list">
         <a href="https://www.postgresql.org/docs/current/mvcc.html" target="_blank" rel="noopener">PostgreSQL — Concurrency Control (MVCC)</a>
         <a href="https://use-the-index-luke.com/" target="_blank" rel="noopener">Use The Index, Luke — SQL indexing guide</a>
@@ -305,6 +323,27 @@ result: count == 1 after two increments — one update LOST.
 fixes:  mutex around the ++            (general, pessimistic)
         atomic fetch_add(count, 1)     (single word, lock-free)
         per-thread counters, sum later (no sharing at all — fastest)</pre>
+
+      <p class="diagram-title">Mutex lock/unlock — the call flow, fast path vs contended</p>
+      <pre class="diagram">lock(m):
+  CAS(m.state: FREE ⇒ LOCKED) ── success ──▶ enter critical section
+        │ fail (held by someone)                 (~nanoseconds, no kernel)
+        ▼
+  spin a little (holder may finish quickly)
+        │ still held
+        ▼
+  futex_wait(m) syscall ──▶ kernel parks this thread      ← the expensive
+        ▲ woken                (µs + context switch,        path: taken only
+        └── retry CAS           cold caches after)          under CONTENTION
+
+unlock(m):
+  m.state ⇒ FREE ── no waiters? ──▶ done (no syscall)
+        │ waiters exist
+        ▼
+  futex_wake(m) ──▶ kernel unparks one waiter ──▶ it retries the CAS
+
+lesson: the primitive is cheap — contention is what costs. shrink the
+critical section and shard the data before switching primitives.</pre>
 
       <p class="diagram-title">Thread-per-connection vs event loop</p>
       <pre class="diagram">thread-per-connection (10k conns):     event loop + epoll (10k conns):
@@ -415,6 +454,23 @@ saga: order svc ──▶ payment svc ──▶ stock svc
       no global locks, always available — but T1/T2 were VISIBLE
       before compensation: design for "paid then refunded" states.</pre>
 
+      <p class="diagram-title">Outbox pattern — killing the dual-write, end to end</p>
+      <pre class="diagram">checkout svc         orders DB               relay          broker      email svc
+ │ BEGIN               │
+ │ INSERT order ──────▶│  ┐ one ACID
+ │ INSERT outbox ─────▶│  ┘ transaction
+ │ COMMIT ────────────▶│     = both rows or neither
+ │ ◀── ok ──────────── │
+                       │◀── poll / CDC ───── │
+                       │── unsent event ───▶ │── publish ──▶ topic ──▶ consume
+                       │◀── mark sent ────── │◀─── ack ────             │
+                                                                        ▼
+                                                            dedupe on event id
+                                                            (delivery = at-least-once)
+crash before COMMIT → no order, no event (nothing to undo)
+crash after COMMIT  → relay retries the publish until acked
+no reachable state where the DB and the broker disagree.</pre>
+
       <p class="diagram-title">Retry stampede — why jitter is not optional</p>
       <pre class="diagram">without jitter:                        with exp backoff + full jitter:
 t=0   1000 clients fail together       t=0    1000 fail
@@ -504,6 +560,22 @@ and ONLY retry idempotent ops. plus circuit breaker: repeated failure
 resumption: PSK ticket → 0-RTT early data (replayable! GETs only)
 server auth = cert chain → CA in client's root store;
 name mismatch / expiry = the failure you'll actually see in prod</pre>
+
+      <p class="diagram-title">URL to first byte — the full sequence, counted in round trips</p>
+      <pre class="diagram">browser          DNS resolver          server / edge        RTT bill (150ms path)
+ │ cache hit? ──▶ │                                          ~0  (usually cached;
+ │ ◀── A record ─ │                                              else the full walk)
+ │ SYN ────────────────────────────────▶ │
+ │ ◀──────────────────────── SYN-ACK ─── │                   1 RTT  (TCP)
+ │ ACK + ClientHello(key share) ───────▶ │
+ │ ◀── ServerHello + cert + finished ─── │                   1 RTT  (TLS 1.3)
+ │ finished + GET /index.html ─────────▶ │
+ │ ◀── 200 OK, first bytes ───────────── │                   1 RTT  (HTTP)
+
+cold connection ≈ 3 RTT ≈ 450ms before byte one at 150ms RTT.
+reused keep-alive connection: 1 RTT.   QUIC: TCP+TLS fold into 1 RTT
+(0-RTT on resumption).   CDN edge at 10ms RTT: same 3 RTTs ≈ 30ms —
+that arithmetic is the whole business case for edges.</pre>
 
       <p class="diagram-title">DNS resolution — cache, then the hierarchy</p>
       <pre class="diagram">browser → OS cache → stub resolver
@@ -633,6 +705,23 @@ backward-compatible schema (v1 and v2 run side by side!)
 blue-green = the all-at-once cousin: full v2 env, atomic switch,
 instant rollback, 2× cost during the swap</pre>
 
+      <p class="diagram-title">One request through the observability stack — how you actually debug</p>
+      <pre class="diagram">request ──▶ gateway ──▶ service A ──▶ service B ──▶ database
+              │ trace-id=7f3a generated, propagated in headers ──▶ ──▶
+              │
+              ├─ spans (timing per hop) ────▶ tracing backend
+              ├─ RED metrics per service ───▶ time-series store
+              └─ logs stamped trace-id=7f3a ▶ log store
+
+debug flow when the pager fires:
+  1. ALERT  metrics: SLO burn — p99 latency 4× budget        (what is hurt)
+  2. TRACE  waterfall for a slow request:
+            gateway 12ms ─ svc A 20ms ─ svc B 1,900ms ◀━━ the hop  (where)
+  3. LOGS   filter trace-id=7f3a on svc B:
+            "connection pool exhausted, waited 1,850ms"      (why)
+one shared id joins all three signals; without it — three silos
+and guesswork. instrument at the edges, propagate context always.</pre>
+
       <p class="diagram-title">Where reads get answered — the caching ladder</p>
       <pre class="diagram">client ─▶ CDN edge ─▶ LB ─▶ app ─▶ Redis ─▶ database
            │ hit? done        │ hit? done     │ the only copy that's TRUE
@@ -729,13 +818,25 @@ function updateScore() {
   }
 }
 
+function appendSnippet(card, code) {
+  const pre = el("pre", "diagram snippet");
+  const parts = code.split("____");
+  parts.forEach((part, i) => {
+    pre.appendChild(document.createTextNode(part));
+    if (i < parts.length - 1) pre.appendChild(el("span", "blank", "____"));
+  });
+  card.appendChild(pre);
+}
+
 function renderQuestion(container, item, number, sectionKey) {
   if (item.type === "multi") return renderMulti(container, item, number, sectionKey);
   if (item.type === "order") return renderOrder(container, item, number, sectionKey);
   const card = el("article", "quiz-card");
   const title = el("p", "q", `Q${number}. ${item.q}`);
+  if (item.type === "code") title.appendChild(el("span", "qtype-tag", "complete the code"));
   if (item.level) title.appendChild(el("span", "level-tag", "senior+"));
   card.appendChild(title);
+  if (item.code) appendSnippet(card, item.code);
   const optionsBox = el("div", "options");
   const explain = el("div", "explain");
   explain.appendChild(document.createTextNode(item.explain));
