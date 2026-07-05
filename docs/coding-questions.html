@@ -1,0 +1,474 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Twelve frequently asked coding interview questions with worked Python solutions: Blind 75 staples, Glassdoor-reported questions, and systems-flavored implementation problems.">
+  <title>Coding Interview Questions and Answers</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    .sub { margin-top: 24px; }
+    .toolbar { position:sticky; top:0; z-index:5; display:flex; flex-wrap:wrap; align-items:center; gap:12px; margin:18px 0; padding:12px 15px; background:var(--panel); border:1px solid var(--line); border-radius:8px; box-shadow:var(--shadow); }
+    .toolbar .section-note { margin:0; flex:1 1 260px; }
+    .bar-btn { min-height:38px; border:1px solid var(--accent); border-radius:6px; padding:7px 14px; background:var(--accent); color:#ffffff; font-weight:700; font-size:14px; cursor:pointer; }
+    .bar-btn:hover { background:var(--accent-strong); border-color:var(--accent-strong); }
+    .qcard { margin:14px 0; padding:16px 18px; background:var(--panel); border:1px solid var(--line); border-radius:8px; box-shadow:var(--shadow); }
+    .qcard h3 { margin-bottom:4px; }
+    .meta { display:flex; flex-wrap:wrap; gap:8px; margin:0 0 10px; }
+    .pill { display:inline-flex; align-items:center; min-height:24px; padding:2px 10px; border-radius:999px; font-size:12px; font-weight:700; }
+    .pill.easy { background:var(--accent-soft); color:var(--accent-strong); }
+    .pill.medium { background:var(--warn-soft); color:var(--warn); }
+    .pill.topic { background:var(--bg); color:var(--muted); border:1px solid var(--line); }
+    .src { margin:0 0 10px; font-size:13px; color:var(--muted); }
+    .code { margin:10px 0 0; padding:12px 14px; overflow-x:auto; background:var(--bg); border:1px solid var(--line); border-radius:6px; font-family:Consolas,Menlo,monospace; font-size:13px; line-height:1.5; color:var(--text); }
+    .sol-btn { margin-top:12px; min-height:36px; border:1px solid var(--accent); border-radius:6px; padding:6px 14px; background:var(--accent); color:#ffffff; font-weight:700; font-size:14px; cursor:pointer; }
+    .sol-btn:hover { background:var(--accent-strong); border-color:var(--accent-strong); }
+    .solution { display:none; margin-top:12px; padding-top:4px; border-top:1px dashed var(--line); }
+    .solution.show { display:block; }
+    .solution h4 { margin:12px 0 6px; font-size:14px; text-transform:uppercase; color:var(--accent-strong); }
+    .solution p { color:var(--muted); }
+    .complexity { display:inline-block; margin-top:8px; padding:4px 10px; border-left:3px solid var(--accent); background:var(--accent-soft); border-radius:0 6px 6px 0; font-size:13px; font-weight:700; }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <p class="eyebrow">Systems study hub</p>
+      <h1>Coding Interview Questions and Answers</h1>
+    </div>
+    <nav aria-label="Site navigation">
+      <a href="index.html">Hub</a>
+      <a href="systems-skills.html">Systems Skills</a>
+      <a href="#classic">Classics</a>
+      <a href="#systems">Systems Coding</a>
+      <a href="#sources">Sources</a>
+    </nav>
+  </header>
+
+  <main id="main">
+    <section class="section intro">
+      <h2>What this is</h2>
+      <p>
+        Twelve coding questions that keep showing up in real interviews — compiled from Glassdoor interview
+        reports (Google, Meta and others), the Blind 75 / Grind 75 lists, and the standard concurrency and
+        low-level-design question banks. Part one covers the algorithm classics; part two covers the
+        systems-flavored implementation questions this hub cares about (thread-safe queues, rate limiters,
+        consistent hashing). Try each one before opening the solution — every answer includes the approach,
+        working Python, complexity, and the follow-ups interviewers actually ask.
+      </p>
+    </section>
+
+    <div class="toolbar">
+      <p class="section-note">Solutions are hidden so you can attempt each problem first.</p>
+      <button class="bar-btn" id="toggle-all" type="button">Show all solutions</button>
+    </div>
+
+    <!-- ============ PART 1: CLASSICS ============ -->
+    <section id="classic" class="section">
+      <h2>1. Algorithm classics</h2>
+
+      <article class="qcard">
+        <h3>Q1. Two Sum</h3>
+        <p class="meta"><span class="pill easy">easy</span><span class="pill topic">hash map</span></p>
+        <p class="src">The "hello world" of coding interviews — first problem in Blind 75; still used as a warm-up screen everywhere.</p>
+        <p>Given an array of integers <code>nums</code> and an integer <code>target</code>, return the indices of the two numbers that add up to <code>target</code>. Exactly one solution exists; you may not use the same element twice. Example: <code>nums=[2,7,11,15], target=9 &rarr; [0,1]</code>.</p>
+        <button class="sol-btn" type="button">Show solution</button>
+        <div class="solution">
+          <h4>Approach</h4>
+          <p>One pass with a hash map from value &rarr; index. For each number, check whether its complement (<code>target - num</code>) has already been seen. The brute force compares all pairs in O(n&sup2;); the map trades O(n) space for one lookup per element.</p>
+          <pre class="code">def two_sum(nums, target):
+    seen = {}                        # value -> index
+    for i, num in enumerate(nums):
+        want = target - num
+        if want in seen:
+            return [seen[want], i]
+        seen[num] = i                # store AFTER the check: no self-pairing</pre>
+          <span class="complexity">O(n) time, O(n) space</span>
+          <h4>Pitfalls &amp; follow-ups</h4>
+          <p>Insert into the map <em>after</em> checking, or <code>target = 2&times;num</code> matches the element with itself. Follow-ups: input sorted (two pointers, O(1) space), find all pairs, or 3Sum below.</p>
+        </div>
+      </article>
+
+      <article class="qcard">
+        <h3>Q2. Find the Extra Character</h3>
+        <p class="meta"><span class="pill easy">easy</span><span class="pill topic">bit tricks / counting</span></p>
+        <p class="src">Reported on Glassdoor for Google software-engineer screens: two strings with the same characters, one has a single extra.</p>
+        <p>String <code>t</code> is <code>s</code> shuffled plus one extra character. Return that character. Example: <code>s="abcd", t="cbdae" &rarr; "e"</code>.</p>
+        <button class="sol-btn" type="button">Show solution</button>
+        <div class="solution">
+          <h4>Approach</h4>
+          <p>XOR every character code of both strings together: pairs cancel (x&oplus;x=0), leaving exactly the extra character. Equivalent one-liner: difference of summed character codes. Both beat the obvious Counter-diff on space.</p>
+          <pre class="code">def extra_char(s, t):
+    acc = 0
+    for ch in s + t:
+        acc ^= ord(ch)      # duplicates cancel out pairwise
+    return chr(acc)
+
+# or: chr(sum(map(ord, t)) - sum(map(ord, s)))</pre>
+          <span class="complexity">O(n) time, O(1) space</span>
+          <h4>Pitfalls &amp; follow-ups</h4>
+          <p>State the invariant (XOR is commutative, associative, self-inverse) — that's what is being tested. Follow-up: the same trick solves "single number" (every element appears twice except one) and "missing number in 1..n".</p>
+        </div>
+      </article>
+
+      <article class="qcard">
+        <h3>Q3. 3Sum — Unique Triplets Summing to Zero</h3>
+        <p class="meta"><span class="pill medium">medium</span><span class="pill topic">sorting + two pointers</span></p>
+        <p class="src">Reported on Glassdoor for Meta/Google onsites; a Blind 75 staple with a famous duplicate-handling trap.</p>
+        <p>Given an integer array, return all <em>unique</em> triplets <code>[a,b,c]</code> with <code>a+b+c=0</code>. Example: <code>[-1,0,1,2,-1,-4] &rarr; [[-1,-1,2],[-1,0,1]]</code>.</p>
+        <button class="sol-btn" type="button">Show solution</button>
+        <div class="solution">
+          <h4>Approach</h4>
+          <p>Sort, then for each anchor index run two pointers over the remainder looking for <code>-anchor</code>. Sorting makes duplicate-skipping possible: advance past equal values at the anchor and at both pointers after each hit.</p>
+          <pre class="code">def three_sum(nums):
+    nums.sort()
+    res = []
+    for i in range(len(nums) - 2):
+        if i and nums[i] == nums[i-1]:          # skip duplicate anchors
+            continue
+        if nums[i] &gt; 0: break                    # sorted: no zero-sum ahead
+        lo, hi = i + 1, len(nums) - 1
+        while lo &lt; hi:
+            s = nums[i] + nums[lo] + nums[hi]
+            if s &lt; 0:   lo += 1
+            elif s &gt; 0: hi -= 1
+            else:
+                res.append([nums[i], nums[lo], nums[hi]])
+                while lo &lt; hi and nums[lo] == nums[lo+1]: lo += 1
+                while lo &lt; hi and nums[hi] == nums[hi-1]: hi -= 1
+                lo += 1; hi -= 1
+    return res</pre>
+          <span class="complexity">O(n&sup2;) time, O(1) extra space (beyond sort/output)</span>
+          <h4>Pitfalls &amp; follow-ups</h4>
+          <p>The interview is really about the three duplicate-skips — a set-of-tuples dedupe works but signals brute force. Follow-ups: 3Sum-closest, 4Sum (one more anchor loop), k-Sum recursion.</p>
+        </div>
+      </article>
+
+      <article class="qcard">
+        <h3>Q4. Merge Overlapping Intervals</h3>
+        <p class="meta"><span class="pill medium">medium</span><span class="pill topic">sorting / sweep</span></p>
+        <p class="src">Blind 75 interval category; constantly reported across Glassdoor for calendar/booking-flavored screens.</p>
+        <p>Given intervals <code>[[1,3],[2,6],[8,10],[15,18]]</code>, merge all overlapping ones &rarr; <code>[[1,6],[8,10],[15,18]]</code>.</p>
+        <button class="sol-btn" type="button">Show solution</button>
+        <div class="solution">
+          <h4>Approach</h4>
+          <p>Sort by start. Sweep left to right keeping the last merged interval: if the next start fits inside it (<code>start &le; last_end</code>), extend the end with <code>max</code>; otherwise emit a new interval. Sorting is what turns "compare everything with everything" into one linear pass.</p>
+          <pre class="code">def merge(intervals):
+    intervals.sort(key=lambda iv: iv[0])
+    out = []
+    for start, end in intervals:
+        if out and start &lt;= out[-1][1]:          # overlaps (or touches) last
+            out[-1][1] = max(out[-1][1], end)    # extend — max matters!
+        else:
+            out.append([start, end])
+    return out</pre>
+          <span class="complexity">O(n log n) time, O(n) output</span>
+          <h4>Pitfalls &amp; follow-ups</h4>
+          <p>The <code>max()</code> is the classic bug: <code>[1,10],[2,3]</code> must stay <code>[1,10]</code>. Clarify whether touching intervals ([1,2],[2,3]) merge. Follow-ups: insert-interval into a sorted list, minimum meeting rooms (heap of end times).</p>
+        </div>
+      </article>
+
+      <article class="qcard">
+        <h3>Q5. Validate a Binary Search Tree</h3>
+        <p class="meta"><span class="pill medium">medium</span><span class="pill topic">trees / recursion</span></p>
+        <p class="src">Reported on Glassdoor for Google ("decide if the given binary tree is a BST"); a canonical recursion-with-invariants test.</p>
+        <p>Return true iff the tree is a valid BST: every node in a left subtree is less than its ancestor node, every node in a right subtree greater — not just the immediate children.</p>
+        <button class="sol-btn" type="button">Show solution</button>
+        <div class="solution">
+          <h4>Approach</h4>
+          <p>Pass down the open interval each node must fall in: root gets (-&infin;, +&infin;); going left tightens the upper bound, going right the lower. Alternative with the same power: an in-order traversal of a BST must be strictly increasing.</p>
+          <pre class="code">def is_bst(node, lo=float("-inf"), hi=float("inf")):
+    if node is None:
+        return True
+    if not (lo &lt; node.val &lt; hi):        # must respect ALL ancestors
+        return False
+    return (is_bst(node.left,  lo, node.val) and
+            is_bst(node.right, node.val, hi))</pre>
+          <span class="complexity">O(n) time, O(h) recursion stack</span>
+          <h4>Pitfalls &amp; follow-ups</h4>
+          <p>The famous wrong answer checks only <code>left.val &lt; node.val &lt; right.val</code> — it accepts a grandchild that violates a grandparent's bound. Also decide how duplicates are treated (strict &lt; here). Follow-ups: recover a BST with two swapped nodes; kth smallest via in-order.</p>
+        </div>
+      </article>
+
+      <article class="qcard">
+        <h3>Q6. Longest Increasing Subsequence</h3>
+        <p class="meta"><span class="pill medium">medium</span><span class="pill topic">DP / binary search</span></p>
+        <p class="src">Reported on Glassdoor with the explicit ask to explain BOTH the O(n&sup2;) and O(n log n) solutions.</p>
+        <p>Length of the longest strictly increasing subsequence (not necessarily contiguous). Example: <code>[10,9,2,5,3,7,101,18] &rarr; 4</code> (2,3,7,101).</p>
+        <button class="sol-btn" type="button">Show solution</button>
+        <div class="solution">
+          <h4>Approach</h4>
+          <p>DP: <code>dp[i]</code> = best LIS ending at i, looking back at all j&lt;i — O(n&sup2;). Patience method: keep <code>tails[k]</code> = smallest possible tail of an increasing subsequence of length k+1; each element binary-searches its slot. <code>tails</code> stays sorted, its length is the answer.</p>
+          <pre class="code">def lis_quadratic(nums):                 # the explainable one
+    dp = [1] * len(nums)
+    for i in range(len(nums)):
+        for j in range(i):
+            if nums[j] &lt; nums[i]:
+                dp[i] = max(dp[i], dp[j] + 1)
+    return max(dp, default=0)
+
+import bisect
+def lis_nlogn(nums):                     # the impressive one
+    tails = []                           # tails[k] = min tail of LIS len k+1
+    for x in nums:
+        k = bisect.bisect_left(tails, x) # first tail &gt;= x
+        if k == len(tails): tails.append(x)
+        else:               tails[k] = x # smaller tail = more room to grow
+    return len(tails)</pre>
+          <span class="complexity">O(n&sup2;) / O(n log n) time</span>
+          <h4>Pitfalls &amp; follow-ups</h4>
+          <p><code>tails</code> is NOT the subsequence itself — only its length is meaningful (reconstructing needs parent links). <code>bisect_left</code> vs <code>bisect_right</code> is the strict-vs-non-strict switch. Follow-up: Russian doll envelopes = LIS after a sort trick.</p>
+        </div>
+      </article>
+
+      <article class="qcard">
+        <h3>Q7. Top K Frequent Elements</h3>
+        <p class="meta"><span class="pill medium">medium</span><span class="pill topic">hash map + heap</span></p>
+        <p class="src">Blind 75 heap category; the "log analysis" screen question in countless Glassdoor reports.</p>
+        <p>Given an array and k, return the k most frequent elements. Example: <code>[1,1,1,2,2,3], k=2 &rarr; [1,2]</code>.</p>
+        <button class="sol-btn" type="button">Show solution</button>
+        <div class="solution">
+          <h4>Approach</h4>
+          <p>Count with a hash map, then select. A size-k min-heap over (count, value) gives O(n log k) — the heap holds the current best k, and anything smaller than its root can't be top-k. Bucket sort by count reaches O(n): index buckets by frequency (at most n), walk from the top.</p>
+          <pre class="code">from collections import Counter
+import heapq
+
+def top_k(nums, k):
+    counts = Counter(nums)                          # O(n)
+    return [v for v, _ in
+            heapq.nlargest(k, counts.items(), key=lambda kv: kv[1])]
+
+def top_k_bucket(nums, k):                          # O(n) version
+    counts = Counter(nums)
+    buckets = [[] for _ in range(len(nums) + 1)]    # index = frequency
+    for val, c in counts.items():
+        buckets[c].append(val)
+    out = []
+    for c in range(len(buckets) - 1, 0, -1):
+        for val in buckets[c]:
+            out.append(val)
+            if len(out) == k: return out</pre>
+          <span class="complexity">O(n log k) heap / O(n) bucket</span>
+          <h4>Pitfalls &amp; follow-ups</h4>
+          <p>Say why it beats full sorting (O(n log n) wastes work ordering elements you'll discard). Follow-ups: top-k in a stream (keep the k-heap), across sharded logs (local top-k, then merge — connects to the distributed section of this hub).</p>
+        </div>
+      </article>
+    </section>
+
+    <!-- ============ PART 2: SYSTEMS CODING ============ -->
+    <section id="systems" class="section">
+      <h2>2. Systems-flavored coding</h2>
+      <p class="section-note">
+        The implementation questions that bridge algorithms and this hub's systems material — asked as
+        "low-level design" or concurrency rounds at infra-heavy teams.
+      </p>
+
+      <article class="qcard">
+        <h3>Q8. LRU Cache with O(1) Operations</h3>
+        <p class="meta"><span class="pill medium">medium</span><span class="pill topic">hash map + doubly linked list</span></p>
+        <p class="src">Possibly the most-asked design-coding question anywhere (LeetCode 146); reported at Twitch, Meta, Amazon and dozens more on Glassdoor.</p>
+        <p>Design a fixed-capacity cache: <code>get(key)</code> returns the value or -1; <code>put(key, value)</code> inserts/updates and evicts the <em>least recently used</em> entry when full. Both must run in O(1) average time.</p>
+        <button class="sol-btn" type="button">Show solution</button>
+        <div class="solution">
+          <h4>Approach</h4>
+          <p>Recency order needs a sequence with O(1) move-to-front and remove-tail: a doubly linked list. Key lookup needs O(1): a hash map pointing at the list nodes. Every get/put unlinks the node and re-links it at the front; eviction pops the tail. Python's <code>OrderedDict</code> packages exactly this pair.</p>
+          <pre class="code">from collections import OrderedDict
+
+class LRUCache:
+    def __init__(self, capacity):
+        self.cap = capacity
+        self.od = OrderedDict()          # front = oldest, end = newest
+
+    def get(self, key):
+        if key not in self.od: return -1
+        self.od.move_to_end(key)         # O(1): relink node as most recent
+        return self.od[key]
+
+    def put(self, key, value):
+        if key in self.od:
+            self.od.move_to_end(key)
+        self.od[key] = value
+        if len(self.od) &gt; self.cap:
+            self.od.popitem(last=False)  # O(1): evict least recent</pre>
+          <span class="complexity">O(1) get / put, O(capacity) space</span>
+          <h4>Pitfalls &amp; follow-ups</h4>
+          <p>If asked to build it raw: sentinel head/tail nodes remove all the null-pointer edge cases; a plain singly linked list fails (O(n) unlink). Follow-ups: thread-safety (one lock, or sharded locks), TTL entries, LFU (LeetCode 460 — count buckets), and "what does Redis actually do?" (approximate LRU sampling).</p>
+        </div>
+      </article>
+
+      <article class="qcard">
+        <h3>Q9. Bounded Blocking Queue (Producer–Consumer)</h3>
+        <p class="meta"><span class="pill medium">medium</span><span class="pill topic">concurrency / condition variables</span></p>
+        <p class="src">The staple concurrency interview (GeeksforGeeks, Hello Interview LLD); tests mutexes, condition variables, and spurious wakeups in one problem.</p>
+        <p>Implement a fixed-capacity queue for multiple producer and consumer threads: <code>put()</code> blocks while full, <code>take()</code> blocks while empty. No busy-waiting.</p>
+        <button class="sol-btn" type="button">Show solution</button>
+        <div class="solution">
+          <h4>Approach</h4>
+          <p>One mutex guards the buffer; two condition variables carry the two wait reasons (<em>not_full</em> for producers, <em>not_empty</em> for consumers). Waits sit in <code>while</code> loops re-checking the predicate — wakeups are hints, not guarantees — and each side signals the <em>other</em> side after mutating.</p>
+          <pre class="code">import threading
+from collections import deque
+
+class BoundedQueue:
+    def __init__(self, capacity):
+        self.buf = deque()
+        self.cap = capacity
+        self.lock = threading.Lock()
+        self.not_full  = threading.Condition(self.lock)
+        self.not_empty = threading.Condition(self.lock)
+
+    def put(self, item):
+        with self.not_full:
+            while len(self.buf) == self.cap:   # WHILE, never if:
+                self.not_full.wait()           # spurious wakeups + races
+            self.buf.append(item)
+            self.not_empty.notify()            # wake one waiting consumer
+
+    def take(self):
+        with self.not_empty:
+            while not self.buf:
+                self.not_empty.wait()
+            item = self.buf.popleft()
+            self.not_full.notify()              # wake one waiting producer
+            return item</pre>
+          <span class="complexity">O(1) per operation; waiting threads sleep (no CPU burn)</span>
+          <h4>Pitfalls &amp; follow-ups</h4>
+          <p>The three classic mistakes: <code>if</code> instead of <code>while</code> around wait; one shared condition with <code>notify()</code> (a producer can wake a producer — use two conditions or <code>notify_all</code>); signaling before releasing consistency. Follow-ups: implement with two semaphores (empty/full slots), poison-pill shutdown, and why unbounded queues break backpressure (ties to the distributed section).</p>
+        </div>
+      </article>
+
+      <article class="qcard">
+        <h3>Q10. Thread-Safe Token-Bucket Rate Limiter</h3>
+        <p class="meta"><span class="pill medium">medium</span><span class="pill topic">concurrency / clocks</span></p>
+        <p class="src">Standard at infra teams (AlgoMaster, Hello Interview, system-design blogs): "allow N requests/sec with bursts — implement it."</p>
+        <p>Implement <code>allow() &rarr; bool</code>: requests consume a token; tokens refill at <code>rate</code> per second up to <code>capacity</code> (burst size). Must be correct under concurrent callers.</p>
+        <button class="sol-btn" type="button">Show solution</button>
+        <div class="solution">
+          <h4>Approach</h4>
+          <p>Lazy refill: no background thread — on each call, compute tokens earned since the last refill from a <em>monotonic</em> clock, cap at capacity, then atomically check-and-decrement under a lock. The check and the decrement must be one critical section or two threads both pass on the last token.</p>
+          <pre class="code">import threading, time
+
+class TokenBucket:
+    def __init__(self, rate, capacity):
+        self.rate = rate                  # tokens added per second
+        self.cap = capacity               # max burst
+        self.tokens = capacity
+        self.last = time.monotonic()      # NEVER time.time(): it can jump
+        self.lock = threading.Lock()
+
+    def allow(self):
+        with self.lock:                   # read-refill-decrement is atomic
+            now = time.monotonic()
+            self.tokens = min(self.cap,
+                              self.tokens + (now - self.last) * self.rate)
+            self.last = now
+            if self.tokens &gt;= 1:
+                self.tokens -= 1
+                return True
+            return False                  # caller: reject or queue</pre>
+          <span class="complexity">O(1) per call, O(1) state per bucket</span>
+          <h4>Pitfalls &amp; follow-ups</h4>
+          <p>Wall-clock time breaks on NTP jumps — use monotonic. Fractional tokens are fine (float); per-key buckets go in a dict (mind cleanup). Follow-ups: token bucket vs leaky bucket vs sliding window; distributed version (state in Redis, refill+decrement in one atomic Lua script — the same race, solved the same way).</p>
+        </div>
+      </article>
+
+      <article class="qcard">
+        <h3>Q11. Retry with Exponential Backoff and Jitter</h3>
+        <p class="meta"><span class="pill easy">easy</span><span class="pill topic">reliability patterns</span></p>
+        <p class="src">Asked as "make this API call robust" at AWS-style shops — the AWS Builders' Library pattern as a coding exercise.</p>
+        <p>Wrap a flaky function so it retries transient failures up to <code>max_attempts</code> times, waiting exponentially longer between tries, with randomized jitter, and a cap on the delay.</p>
+        <button class="sol-btn" type="button">Show solution</button>
+        <div class="solution">
+          <h4>Approach</h4>
+          <p>Delay for attempt n is <code>random.uniform(0, min(cap, base &times; 2&#8319;))</code> — "full jitter". The exponential spreads load over time; the randomization decorrelates clients so a synchronized failure doesn't retry as a synchronized stampede.</p>
+          <pre class="code">import random, time
+
+def retry(fn, max_attempts=5, base=0.1, cap=10.0,
+          retryable=(TimeoutError, ConnectionError)):
+    for attempt in range(max_attempts):
+        try:
+            return fn()
+        except retryable:
+            if attempt == max_attempts - 1:
+                raise                          # budget exhausted: surface it
+            delay = random.uniform(0, min(cap, base * 2 ** attempt))
+            time.sleep(delay)                  # full jitter: U(0, exp cap)</pre>
+          <span class="complexity">Worst-case wait bounded by &Sigma; min(cap, base·2&#8319;)</span>
+          <h4>Pitfalls &amp; follow-ups</h4>
+          <p>Only retry <em>transient</em> errors (a 400 will fail forever; a timeout may have succeeded server-side — so the operation must be idempotent). Never retry without jitter. Follow-ups: honor an overall deadline instead of attempt count, retry budgets (retries as % of traffic), and where the circuit breaker takes over — this is the coding half of the retry-amplification postmortem in the distributed section.</p>
+        </div>
+      </article>
+
+      <article class="qcard">
+        <h3>Q12. Consistent Hashing Ring</h3>
+        <p class="meta"><span class="pill medium">medium</span><span class="pill topic">distributed systems / binary search</span></p>
+        <p class="src">The "design a cache cluster's key placement" question — asked wherever sharding is discussed; the algorithm inside Dynamo, Cassandra, and memcached clients.</p>
+        <p>Implement <code>add_node</code>, <code>remove_node</code>, and <code>get_node(key)</code> such that keys spread evenly and adding/removing a node remaps only ~1/N of keys (naive <code>hash(key) % N</code> remaps almost everything).</p>
+        <button class="sol-btn" type="button">Show solution</button>
+        <div class="solution">
+          <h4>Approach</h4>
+          <p>Hash nodes onto a circle (0..2&sup3;&sup2;); a key belongs to the first node clockwise from its own hash — a binary search over the sorted node-hash list. Each physical node gets many <em>virtual nodes</em> (replicas of its hash with different salts) so load spreads evenly and a leaving node's keys scatter to everyone, not one neighbor.</p>
+          <pre class="code">import bisect, hashlib
+
+def _h(s):
+    return int(hashlib.md5(s.encode()).hexdigest(), 16) % (2 ** 32)
+
+class HashRing:
+    def __init__(self, vnodes=100):
+        self.vnodes = vnodes
+        self.ring = []            # sorted list of (hash, node)
+
+    def add_node(self, node):
+        for i in range(self.vnodes):
+            bisect.insort(self.ring, (_h(f"{node}#{i}"), node))
+
+    def remove_node(self, node):
+        self.ring = [(h, n) for h, n in self.ring if n != node]
+
+    def get_node(self, key):
+        if not self.ring: return None
+        i = bisect.bisect(self.ring, (_h(key), chr(0x10FFFF)))
+        return self.ring[i % len(self.ring)][1]   # wrap = the "circle"</pre>
+          <span class="complexity">O(log V) lookup, O(V log V) add — V = total virtual nodes</span>
+          <h4>Pitfalls &amp; follow-ups</h4>
+          <p>Without virtual nodes, two physical nodes split the circle terribly unevenly, and removal dumps an entire arc on one survivor. The modulo wrap at the end IS the ring. Follow-ups: weighted nodes (more vnodes = more traffic), how this connects to the shard-key discussion in the databases section, and bounded-load consistent hashing.</p>
+        </div>
+      </article>
+    </section>
+
+    <!-- ============ SOURCES ============ -->
+    <section id="sources" class="section">
+      <h2>Sources &amp; further practice</h2>
+      <div class="link-list">
+        <a href="https://www.glassdoor.com/Interview/coding-interview-questions-SRCH_KO0,6.htm" target="_blank" rel="noopener">Glassdoor — coding interview reports</a>
+        <a href="https://www.techinterviewhandbook.org/grind75/" target="_blank" rel="noopener">Grind 75 (successor to Blind 75)</a>
+        <a href="https://neetcode.io/practice/practice/blind75" target="_blank" rel="noopener">Blind 75 with video solutions — NeetCode</a>
+        <a href="https://leetcode.com/problems/lru-cache/" target="_blank" rel="noopener">LRU Cache — LeetCode 146</a>
+        <a href="https://www.hellointerview.com/learn/low-level-design/concurrency/intro" target="_blank" rel="noopener">Concurrency for interviews — Hello Interview</a>
+        <a href="https://aws.amazon.com/builders-library/timeouts-retries-and-backoff-with-jitter/" target="_blank" rel="noopener">Backoff with jitter — AWS Builders' Library</a>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <p>Last updated: 2026-07-05. Styles shared with the Isaac Sim study hub.</p>
+  </footer>
+
+<script>
+for (const btn of document.querySelectorAll(".sol-btn")) {
+  btn.addEventListener("click", () => {
+    const sol = btn.nextElementSibling;
+    const on = sol.classList.toggle("show");
+    btn.textContent = on ? "Hide solution" : "Show solution";
+  });
+}
+const allBtn = document.getElementById("toggle-all");
+allBtn.addEventListener("click", () => {
+  const showing = allBtn.dataset.on === "1";
+  for (const sol of document.querySelectorAll(".solution")) sol.classList.toggle("show", !showing);
+  for (const btn of document.querySelectorAll(".sol-btn")) btn.textContent = showing ? "Show solution" : "Hide solution";
+  allBtn.dataset.on = showing ? "0" : "1";
+  allBtn.textContent = showing ? "Show all solutions" : "Hide all solutions";
+});
+</script>
+</body>
+</html>
