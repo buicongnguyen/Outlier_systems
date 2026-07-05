@@ -55,6 +55,35 @@
     .source-grid article { padding:14px; margin-bottom:0; }
     .quiz-card .snippet { margin:0 0 12px; font-size:13px; }
     .quiz-card .snippet .blank { color:var(--warn); font-weight:700; }
+    .anim-block { margin:16px 0 0; padding:14px 16px; background:var(--panel); border:1px solid var(--line); border-radius:8px; box-shadow:var(--shadow); }
+    .anim-controls { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-bottom:12px; }
+    .abtn { min-height:34px; border:1px solid var(--accent); border-radius:6px; padding:5px 13px; background:var(--accent); color:#ffffff; font-weight:700; font-size:13px; cursor:pointer; }
+    .abtn.secondary { background:var(--panel); color:var(--text); border-color:var(--line); }
+    .abtn.secondary:hover:enabled { border-color:var(--accent); color:var(--accent-strong); background:var(--accent-soft); }
+    .abtn:disabled { opacity:0.45; cursor:default; }
+    .anim-step-no { margin-left:auto; font-size:12px; font-weight:700; color:var(--muted); }
+    .anim-grid { display:grid; grid-template-columns:minmax(230px,1.25fr) minmax(160px,1fr) minmax(160px,1fr); gap:12px; }
+    .anim-col h4 { margin:0 0 6px; font-size:12px; text-transform:uppercase; letter-spacing:0.4px; color:var(--accent-strong); }
+    .anim-code { margin:0; padding:10px 8px; background:var(--bg); border:1px solid var(--line); border-radius:6px; font-family:Consolas,Menlo,monospace; font-size:12.5px; line-height:1.65; overflow-x:auto; }
+    .anim-code .cl { display:block; padding:0 7px; border-radius:4px; white-space:pre; }
+    .anim-code .cl.hot { background:var(--accent-soft); outline:1px solid var(--accent); }
+    .anim-stack, .anim-heap { display:flex; flex-direction:column; gap:8px; min-height:190px; padding:10px; background:var(--bg); border:1px solid var(--line); border-radius:6px; }
+    .anim-stack { justify-content:flex-end; }
+    .anim-zone-note { margin:0; font-size:11px; color:var(--muted); text-align:center; }
+    .aframe { padding:6px 9px; background:var(--panel); border:1px solid var(--accent); border-radius:6px; font-family:Consolas,Menlo,monospace; font-size:12.5px; }
+    .aframe .fname { font-weight:700; color:var(--accent-strong); }
+    .aframe .fvar { display:flex; justify-content:space-between; gap:10px; color:var(--muted); }
+    .hobj { padding:6px 9px; background:var(--panel); border:1px solid var(--warn); border-radius:6px; font-family:Consolas,Menlo,monospace; font-size:12.5px; }
+    .hobj .hname { font-weight:700; color:var(--warn); }
+    .hobj.freed { opacity:0.4; border-style:dashed; }
+    .hobj.freed .hval { text-decoration:line-through; }
+    .aptr { color:var(--accent-strong); font-weight:700; }
+    .enter { animation:animEnter 0.45s ease; }
+    @keyframes animEnter { from { opacity:0; transform:translateY(-10px); } to { opacity:1; transform:none; } }
+    .flash { animation:animFlash 0.9s ease; }
+    @keyframes animFlash { 0% { background:var(--warn-soft); } 100% { background:var(--panel); } }
+    .anim-caption { margin:12px 0 0; padding:9px 12px; border-left:3px solid var(--accent); background:var(--accent-soft); border-radius:0 6px 6px 0; font-size:14px; min-height:44px; }
+    @media (max-width: 760px) { .anim-grid { grid-template-columns:1fr; } }
   </style>
 </head>
 <body>
@@ -364,6 +393,131 @@ state machines written for you         (offload CPU work to a pool)</pre>
         <a href="https://preshing.com/20120913/acquire-and-release-semantics/" target="_blank" rel="noopener">Acquire and release semantics — Preshing</a>
         <a href="https://www.brendangregg.com/linuxperf.html" target="_blank" rel="noopener">Linux performance tools — Brendan Gregg</a>
       </div>
+
+      <h3 class="sub">Animated walkthrough — stack &amp; heap during a function call</h3>
+      <p class="section-note">
+        Step through (or play) a tiny program to watch frames push and pop on the stack while the
+        heap object they point at is allocated, shared, mutated, and freed.
+      </p>
+      <div class="anim-block" id="sh-anim">
+        <div class="anim-controls">
+          <button class="abtn secondary" id="sh-back" type="button">&#9664; Back</button>
+          <button class="abtn" id="sh-play" type="button">&#9654; Play</button>
+          <button class="abtn secondary" id="sh-step" type="button">Step &#9654;</button>
+          <button class="abtn secondary" id="sh-reset" type="button">&#8635; Reset</button>
+          <span class="anim-step-no" id="sh-stepno"></span>
+        </div>
+        <div class="anim-grid">
+          <div class="anim-col">
+            <h4>Code</h4>
+            <pre class="anim-code" id="sh-code"></pre>
+          </div>
+          <div class="anim-col">
+            <h4>Stack (grows &#9650;, auto-freed)</h4>
+            <div class="anim-stack" id="sh-stack"><p class="anim-zone-note">empty</p></div>
+          </div>
+          <div class="anim-col">
+            <h4>Heap (alloc / free)</h4>
+            <div class="anim-heap" id="sh-heap"><p class="anim-zone-note">empty</p></div>
+          </div>
+        </div>
+        <p class="anim-caption" id="sh-caption"></p>
+      </div>
+      <script>
+      (function () {
+        const CODE = [
+          "main():",
+          "  a = 10",
+          "  p = alloc(Node{val: 21})",
+          "  process(p)",
+          "  free(p)",
+          "  return",
+          "",
+          "process(q):",
+          "  b = q.val * 2",
+          "  q.val = b",
+          "  return"
+        ];
+        // Each snapshot is the COMPLETE state: hot code line, stack (newest frame first), heap, caption.
+        // vars: [name, value, isPointer]; heap objects: [id, label, value, freed]
+        const STEPS = [
+          { line: 0, stack: [["main", []]], heap: [],
+            cap: "Calling main pushes a stack FRAME — a scratch area for this call's locals. The stack is a LIFO pile of frames." },
+          { line: 1, stack: [["main", [["a", "10", false]]]], heap: [],
+            cap: "a = 10 — a plain value stored inline in the frame. Stack allocation is just moving the stack pointer: effectively free." },
+          { line: 2, stack: [["main", [["a", "10", false], ["p", "● #1", true]]]], heap: [["1", "Node #1", "val: 21", false]],
+            cap: "alloc() reserves memory on the HEAP. The Node itself lives there; only its address — the pointer p — sits on the stack." },
+          { line: 3, stack: [["process", [["q", "● #1", true]]], ["main", [["a", "10", false], ["p", "● #1", true]]]], heap: [["1", "Node #1", "val: 21", false]],
+            cap: "Calling process pushes a second frame. q receives a COPY of the pointer — two stack slots now point at ONE shared heap object." },
+          { line: 8, stack: [["process", [["q", "● #1", true], ["b", "42", false]]], ["main", [["a", "10", false], ["p", "● #1", true]]]], heap: [["1", "Node #1", "val: 21", false]],
+            cap: "q.val is read by FOLLOWING the pointer into the heap: 21 × 2 = 42, stored in the stack local b." },
+          { line: 9, stack: [["process", [["q", "● #1", true], ["b", "42", false]]], ["main", [["a", "10", false], ["p", "● #1", true]]]], heap: [["1", "Node #1", "val: 42", false]],
+            cap: "Writing q.val mutates the SHARED heap object in place — main will see 42 through p. This aliasing is the power and the danger of pointers." },
+          { line: 10, stack: [["main", [["a", "10", false], ["p", "● #1", true]]]], heap: [["1", "Node #1", "val: 42", false]],
+            cap: "return pops the frame: q and b vanish automatically — stack cleanup is free. The heap Node SURVIVES the call." },
+          { line: 4, stack: [["main", [["a", "10", false], ["p", "● #1", true]]]], heap: [["1", "Node #1", "val: 42", true]],
+            cap: "Heap memory outlives frames, so someone must release it: free() in C, RAII/ownership in C++/Rust, or a GC pass in Java/Go/C#." },
+          { line: 5, stack: [], heap: [["1", "Node #1", "val: 42", true]],
+            cap: "main returns and the stack is empty. Had we skipped free(), Node #1 would linger unreachable — a memory LEAK." }
+        ];
+
+        const $ = id => document.getElementById(id);
+        const codeEl = $("sh-code"), stackEl = $("sh-stack"), heapEl = $("sh-heap");
+        codeEl.innerHTML = CODE.map((l, i) => `<span class="cl" data-l="${i}">${l === "" ? " " : l.replace(/</g, "&lt;")}</span>`).join("");
+
+        let cur = 0, prev = -1, timer = null;
+
+        function render() {
+          const s = STEPS[cur], before = prev >= 0 ? STEPS[prev] : { stack: [], heap: [] };
+          codeEl.querySelectorAll(".cl").forEach(el => el.classList.toggle("hot", Number(el.dataset.l) === s.line));
+
+          stackEl.innerHTML = s.stack.length ? "" : '<p class="anim-zone-note">empty</p>';
+          const prevFrames = before.stack.map(f => f[0]);
+          for (const [name, vars] of s.stack) {
+            const d = document.createElement("div");
+            d.className = "aframe" + (prevFrames.includes(name) ? "" : " enter");
+            d.innerHTML = `<div class="fname">${name}()</div>` +
+              vars.map(v => `<div class="fvar"><span>${v[0]}</span><span class="${v[2] ? "aptr" : ""}">${v[1]}</span></div>`).join("");
+            stackEl.appendChild(d);
+          }
+          if (s.stack.length) {
+            const n = document.createElement("p");
+            n.className = "anim-zone-note"; n.textContent = "▲ newest frame on top";
+            stackEl.appendChild(n);
+          }
+
+          heapEl.innerHTML = s.heap.length ? "" : '<p class="anim-zone-note">empty</p>';
+          for (const [id, label, val, freed] of s.heap) {
+            const pv = before.heap.find(h => h[0] === id);
+            const d = document.createElement("div");
+            d.className = "hobj" + (freed ? " freed" : "") + (!pv ? " enter" : (pv[2] !== val ? " flash" : ""));
+            d.innerHTML = `<div class="hname">${label}${freed ? " (freed)" : ""}</div><div class="hval">${val}</div>`;
+            heapEl.appendChild(d);
+          }
+
+          $("sh-caption").textContent = s.cap;
+          $("sh-stepno").textContent = `step ${cur + 1} / ${STEPS.length}`;
+          $("sh-back").disabled = cur === 0;
+          $("sh-step").disabled = cur === STEPS.length - 1;
+        }
+
+        function go(n) { if (n < 0 || n >= STEPS.length) return stop(); prev = cur; cur = n; render(); }
+        function stop() {
+          if (timer) { clearInterval(timer); timer = null; }
+          $("sh-play").innerHTML = "&#9654; Play";
+        }
+        $("sh-step").addEventListener("click", () => { stop(); go(cur + 1); });
+        $("sh-back").addEventListener("click", () => { stop(); go(cur - 1); });
+        $("sh-reset").addEventListener("click", () => { stop(); prev = -1; cur = 0; render(); });
+        $("sh-play").addEventListener("click", () => {
+          if (timer) return stop();
+          if (cur === STEPS.length - 1) { prev = -1; cur = 0; render(); }
+          $("sh-play").innerHTML = "&#10074;&#10074; Pause";
+          timer = setInterval(() => { cur === STEPS.length - 1 ? stop() : go(cur + 1); }, 1700);
+        });
+        render();
+      })();
+      </script>
 
       <h3 class="sub">Practice questions</h3>
       <span class="sec-score" id="sec-score-os">Section score: 0 / 0</span>
