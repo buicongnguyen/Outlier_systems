@@ -84,6 +84,21 @@
     @keyframes animFlash { 0% { background:var(--warn-soft); } 100% { background:var(--panel); } }
     .anim-caption { margin:12px 0 0; padding:9px 12px; border-left:3px solid var(--accent); background:var(--accent-soft); border-radius:0 6px 6px 0; font-size:14px; min-height:44px; }
     @media (max-width: 760px) { .anim-grid { grid-template-columns:1fr; } }
+    .seq { margin:14px 0 0; padding:12px; background:var(--panel); border:1px solid var(--line); border-radius:8px; box-shadow:var(--shadow); overflow-x:auto; }
+    .seq svg { display:block; margin:0 auto; font-family:Arial,Helvetica,sans-serif; }
+    .sq-actor { fill:var(--accent-soft); stroke:var(--accent); }
+    .sq-actorlab { fill:var(--accent-strong); font-size:13px; font-weight:700; }
+    .sq-life { stroke:var(--line); stroke-dasharray:4 4; }
+    .sq-msg { stroke:var(--accent-strong); stroke-width:1.6; }
+    .sq-warnline { stroke:var(--warn); stroke-width:1.6; }
+    .sq-dash { stroke-dasharray:6 5; }
+    .sq-lab { fill:var(--text); font-size:12px; }
+    .sq-lab.warn { fill:var(--warn); font-weight:700; }
+    .sq-state { fill:var(--muted); font-size:12px; font-style:italic; }
+    .sq-note { fill:var(--warn-soft); stroke:var(--warn); }
+    .sq-notetext { fill:var(--text); font-size:12px; }
+    .sq-arrowhead { fill:var(--accent-strong); }
+    .sq-arrowhead-w { fill:var(--warn); }
   </style>
 </head>
 <body>
@@ -239,18 +254,7 @@ invariant both checked. fix: SERIALIZABLE or SELECT ... FOR UPDATE.
 (* Postgres RR blocks phantoms; InnoDB RR mostly via gap locks)</pre>
 
       <p class="diagram-title">Replication lag — the read-your-own-writes sequence</p>
-      <pre class="diagram">app                    primary                 replica (async)
- │ UPDATE profile ────▶ │
- │ ◀── COMMIT ok ────── │
- │                      │── ship WAL ─────────▶ │   lag: ms … seconds
- │ GET /profile ────────┼───────────────────────▶│   (read routed to replica)
- │ ◀── OLD row ─────────┼─────────────────────── │   not applied yet!
- │  "my edit vanished"  │        ...             │
- │                      │── apply WAL ─────────▶ │   now consistent — too late
-
-fixes: pin this user's reads to the primary briefly after a write,
-or hold the write's LSN in the session and only read from replicas
-that have applied it, or accept staleness where the product allows.</pre>
+      <div class="seq" id="seq-replag"></div>
 
       <div class="link-list">
         <a href="https://www.postgresql.org/docs/current/mvcc.html" target="_blank" rel="noopener">PostgreSQL — Concurrency Control (MVCC)</a>
@@ -610,21 +614,7 @@ saga: order svc ──▶ payment svc ──▶ stock svc
       before compensation: design for "paid then refunded" states.</pre>
 
       <p class="diagram-title">Outbox pattern — killing the dual-write, end to end</p>
-      <pre class="diagram">checkout svc         orders DB               relay          broker      email svc
- │ BEGIN               │
- │ INSERT order ──────▶│  ┐ one ACID
- │ INSERT outbox ─────▶│  ┘ transaction
- │ COMMIT ────────────▶│     = both rows or neither
- │ ◀── ok ──────────── │
-                       │◀── poll / CDC ───── │
-                       │── unsent event ───▶ │── publish ──▶ topic ──▶ consume
-                       │◀── mark sent ────── │◀─── ack ────             │
-                                                                        ▼
-                                                            dedupe on event id
-                                                            (delivery = at-least-once)
-crash before COMMIT → no order, no event (nothing to undo)
-crash after COMMIT  → relay retries the publish until acked
-no reachable state where the DB and the broker disagree.</pre>
+      <div class="seq" id="seq-outbox"></div>
 
       <p class="diagram-title">Retry stampede — why jitter is not optional</p>
       <pre class="diagram">without jitter:                        with exp backoff + full jitter:
@@ -694,58 +684,16 @@ and ONLY retry idempotent ops. plus circuit breaker: repeated failure
       </div>
 
       <p class="diagram-title">TCP 3-way handshake and teardown</p>
-      <pre class="diagram">client                                server
-  │ ── SYN, seq=x ──────────────────▶ │   "let's talk, my numbering starts at x"
-  │ ◀─ SYN-ACK, seq=y, ack=x+1 ────── │   "mine starts at y, got yours"
-  │ ── ACK, ack=y+1 ────────────────▶ │   ESTABLISHED (1 RTT before data)
-  │ ══ data flows, every byte numbered and acked ══
-  │ ── FIN ─────────────────────────▶ │   each side closes independently
-  │ ◀─ ACK,  then FIN ─────────────── │
-  │ ── ACK ─────────────────────────▶ │
-  TIME_WAIT (client lingers ~60s to absorb stragglers —
-  port exhaustion trap for clients churning short connections)</pre>
+      <div class="seq" id="seq-tcp"></div>
 
       <p class="diagram-title">TLS 1.3 handshake — one round trip, forward secret</p>
-      <pre class="diagram">client                                          server
-  │ ── ClientHello + key_share (ECDHE) ───────▶ │
-  │ ◀─ ServerHello + key_share,                 │  both sides now derive
-  │     {certificate, cert-verify, finished}─── │  session keys (ephemeral
-  │ ── {finished} + APPLICATION DATA ─────────▶ │  ECDHE ⇒ forward secrecy)
-        1 RTT to first byte (TLS 1.2 took 2)
-resumption: PSK ticket → 0-RTT early data (replayable! GETs only)
-server auth = cert chain → CA in client's root store;
-name mismatch / expiry = the failure you'll actually see in prod</pre>
+      <div class="seq" id="seq-tls"></div>
 
       <p class="diagram-title">URL to first byte — the full sequence, counted in round trips</p>
-      <pre class="diagram">browser          DNS resolver          server / edge        RTT bill (150ms path)
- │ cache hit? ──▶ │                                          ~0  (usually cached;
- │ ◀── A record ─ │                                              else the full walk)
- │ SYN ────────────────────────────────▶ │
- │ ◀──────────────────────── SYN-ACK ─── │                   1 RTT  (TCP)
- │ ACK + ClientHello(key share) ───────▶ │
- │ ◀── ServerHello + cert + finished ─── │                   1 RTT  (TLS 1.3)
- │ finished + GET /index.html ─────────▶ │
- │ ◀── 200 OK, first bytes ───────────── │                   1 RTT  (HTTP)
-
-cold connection ≈ 3 RTT ≈ 450ms before byte one at 150ms RTT.
-reused keep-alive connection: 1 RTT.   QUIC: TCP+TLS fold into 1 RTT
-(0-RTT on resumption).   CDN edge at 10ms RTT: same 3 RTTs ≈ 30ms —
-that arithmetic is the whole business case for edges.</pre>
+      <div class="seq" id="seq-url"></div>
 
       <p class="diagram-title">DNS resolution — cache, then the hierarchy</p>
-      <pre class="diagram">browser → OS cache → stub resolver
-                        │ miss
-                        ▼
-              recursive resolver (ISP / 1.1.1.1 / 8.8.8.8)
-               │ cache miss? walk down:
-               ├─▶ root:          "ask .com" ──▶ NS
-               ├─▶ .com TLD:      "ask ns1.example-dns.com"
-               └─▶ authoritative: "shop.example.com A 203.0.113.7  TTL 300"
-                        │
-              cache for TTL, return address
-low TTL  = fast failover, constant queries
-high TTL = efficient, but changes crawl out as caches expire
-("propagation" is nothing but TTL expiry)</pre>
+      <div class="seq" id="seq-dns"></div>
 
       <p class="diagram-title">Head-of-line blocking across HTTP generations</p>
       <pre class="diagram">HTTP/1.1 (per connection):   req A ──▶ resp A │ req B waits... │ resp B
@@ -925,6 +873,144 @@ failure modes to design for:
     <p>Last updated: 2026-07-04. Styles shared with the Isaac Sim study hub.</p>
   </footer>
 
+<script>
+// Lightweight SVG sequence-diagram renderer (theme-aware via CSS variables).
+(function () {
+  const esc = s => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+  function seq(mountId, spec) {
+    const laneW = spec.laneW || 300, margin = spec.margin || 100;
+    const fs = spec.fs || 12, rowH = spec.rowH || 38, boxW = spec.boxW || 150, boxH = 30;
+    const A = spec.actors, W = margin * 2 + laneW * (A.length - 1);
+    const X = i => margin + i * laneW;
+    const lifeTop = 8 + boxH;
+    let y = lifeTop + 28;
+    const body = [];
+    for (const s of spec.steps) {
+      if (s.note) {
+        const h = 14 + s.note.length * 16;
+        body.push(`<rect x="18" y="${y - 12}" width="${W - 36}" height="${h}" rx="6" class="sq-note"/>`);
+        s.note.forEach((ln, i) =>
+          body.push(`<text x="${W / 2}" y="${y + 6 + i * 16}" text-anchor="middle" class="sq-notetext">${esc(ln)}</text>`));
+        y += h + 16;
+      } else if (s.state) {
+        body.push(`<text x="${W / 2}" y="${y}" text-anchor="middle" class="sq-state">${esc(s.state)}</text>`);
+        y += 30;
+      } else {
+        const x1 = X(s.f), x2 = X(s.t), tip = x2 > x1 ? x2 - 8 : x2 + 8;
+        body.push(`<text x="${(x1 + x2) / 2}" y="${y - 6}" text-anchor="middle" class="sq-lab${s.warn ? " warn" : ""}" font-size="${fs}">${esc(s.l)}</text>`);
+        body.push(`<line x1="${x1}" y1="${y}" x2="${tip}" y2="${y}" class="${s.warn ? "sq-warnline" : "sq-msg"}${s.d ? " sq-dash" : ""}" marker-end="url(#${s.warn ? "sqarw-w" : "sqarw"})"/>`);
+        y += rowH;
+      }
+    }
+    const H = y + 6;
+    let out = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" role="img">` +
+      `<defs>` +
+      `<marker id="sqarw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="sq-arrowhead"/></marker>` +
+      `<marker id="sqarw-w" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="sq-arrowhead-w"/></marker>` +
+      `</defs>`;
+    A.forEach((a, i) => {
+      out += `<line x1="${X(i)}" y1="${lifeTop}" x2="${X(i)}" y2="${H - 4}" class="sq-life"/>` +
+        `<rect x="${X(i) - boxW / 2}" y="8" width="${boxW}" height="${boxH}" rx="6" class="sq-actor"/>` +
+        `<text x="${X(i)}" y="${8 + boxH / 2 + 4.5}" text-anchor="middle" class="sq-actorlab">${esc(a)}</text>`;
+    });
+    document.getElementById(mountId).innerHTML = out + body.join("") + "</svg>";
+  }
+
+  seq("seq-replag", {
+    actors: ["App", "Primary", "Replica (async)"], laneW: 310, margin: 105,
+    steps: [
+      { f: 0, t: 1, l: "UPDATE profile" },
+      { f: 1, t: 0, l: "COMMIT ok", d: 1 },
+      { f: 1, t: 2, l: "ship WAL  (lag: ms … seconds)", d: 1 },
+      { f: 0, t: 2, l: "GET /profile — read routed to a replica" },
+      { f: 2, t: 0, l: "OLD row — write not applied yet: “my edit vanished”", d: 1, warn: 1 },
+      { f: 1, t: 2, l: "apply WAL — now consistent, too late", d: 1 },
+      { note: ["fixes: pin this user's reads to the primary briefly after a write · hold the write's LSN",
+               "in the session and read only replicas that applied it · or accept staleness where allowed"] }
+    ]
+  });
+
+  seq("seq-tcp", {
+    actors: ["Client", "Server"], laneW: 480, margin: 115,
+    steps: [
+      { f: 0, t: 1, l: "SYN, seq = x  —  “my numbering starts at x”" },
+      { f: 1, t: 0, l: "SYN-ACK, seq = y, ack = x+1  —  “mine starts at y, got yours”", d: 1 },
+      { f: 0, t: 1, l: "ACK, ack = y+1" },
+      { state: "ESTABLISHED after 1 RTT — data flows, every byte numbered and acked" },
+      { f: 0, t: 1, l: "FIN  (each side closes independently)" },
+      { f: 1, t: 0, l: "ACK, then its own FIN", d: 1 },
+      { f: 0, t: 1, l: "ACK" },
+      { note: ["client enters TIME_WAIT (~60 s) to absorb straggler packets —",
+               "the port-exhaustion trap for clients churning short-lived connections"] }
+    ]
+  });
+
+  seq("seq-tls", {
+    actors: ["Client", "Server"], laneW: 480, margin: 115,
+    steps: [
+      { f: 0, t: 1, l: "ClientHello + key_share (ECDHE)" },
+      { f: 1, t: 0, l: "ServerHello + key_share, {certificate, certificate-verify, finished}", d: 1 },
+      { state: "both sides derive session keys — ephemeral ECDHE ⇒ forward secrecy" },
+      { f: 0, t: 1, l: "{finished} + application data — 1 RTT to first byte (TLS 1.2 took 2)" },
+      { note: ["resumption: PSK ticket → 0-RTT early data (replayable — idempotent requests only)",
+               "server auth = certificate chain to a CA in the client's root store;",
+               "name mismatch / expiry remain the failures you'll actually see in production"] }
+    ]
+  });
+
+  seq("seq-outbox", {
+    actors: ["Checkout svc", "Orders DB", "Relay", "Broker", "Email svc"], laneW: 195, margin: 95, fs: 11, boxW: 130,
+    steps: [
+      { f: 0, t: 1, l: "BEGIN: INSERT order + INSERT outbox" },
+      { f: 0, t: 1, l: "COMMIT — both rows or neither" },
+      { f: 1, t: 0, l: "ok", d: 1 },
+      { f: 2, t: 1, l: "poll / CDC" },
+      { f: 1, t: 2, l: "unsent event", d: 1 },
+      { f: 2, t: 3, l: "publish" },
+      { f: 3, t: 4, l: "deliver (at-least-once)" },
+      { state: "consumer dedupes on event id — duplicates are possible, effects applied once" },
+      { f: 3, t: 2, l: "ack", d: 1 },
+      { f: 2, t: 1, l: "mark sent" },
+      { note: ["crash before COMMIT → no order, no event · crash after COMMIT → relay retries until acked",
+               "no reachable state where the database and the broker disagree"] }
+    ]
+  });
+
+  seq("seq-url", {
+    actors: ["Browser", "DNS resolver", "Server / edge"], laneW: 330, margin: 105,
+    steps: [
+      { f: 0, t: 1, l: "resolve shop.example.com (usually cached ≈ 0 RTT)" },
+      { f: 1, t: 0, l: "A record", d: 1 },
+      { f: 0, t: 2, l: "SYN" },
+      { f: 2, t: 0, l: "SYN-ACK — TCP handshake: 1 RTT", d: 1 },
+      { f: 0, t: 2, l: "ACK + ClientHello (key share)" },
+      { f: 2, t: 0, l: "ServerHello + certificate + finished — TLS 1.3: 1 RTT", d: 1 },
+      { f: 0, t: 2, l: "finished + GET /index.html" },
+      { f: 2, t: 0, l: "200 OK, first bytes — HTTP: 1 RTT", d: 1 },
+      { note: ["cold connection ≈ 3 RTT ≈ 450 ms at a 150 ms RTT — keep-alive reuse drops it to 1 RTT",
+               "QUIC folds TCP+TLS into 1 RTT (0-RTT on resumption) · CDN edge at 10 ms RTT ≈ 30 ms total:",
+               "that arithmetic is the whole business case for edges"] }
+    ]
+  });
+
+  seq("seq-dns", {
+    actors: ["Client", "Recursive resolver", "Root", ".com TLD", "Authoritative"], laneW: 195, margin: 95, fs: 11, boxW: 138,
+    steps: [
+      { f: 0, t: 1, l: "shop.example.com?" },
+      { f: 1, t: 2, l: "cache miss — ask root" },
+      { f: 2, t: 1, l: "“ask the .com servers”", d: 1 },
+      { f: 1, t: 3, l: "ask .com TLD" },
+      { f: 3, t: 1, l: "“ask example.com's nameservers”", d: 1 },
+      { f: 1, t: 4, l: "query authoritative" },
+      { f: 4, t: 1, l: "A 203.0.113.7 · TTL 300", d: 1 },
+      { f: 1, t: 0, l: "answer — cached for the TTL at every layer" },
+      { note: ["low TTL = fast failover but constant queries · high TTL = efficient but changes crawl out",
+               "“DNS propagation” is nothing but caches expiring"] }
+    ]
+  });
+})();
+</script>
 <script src="quiz-data.js"></script>
 <script>
 const state = {};
