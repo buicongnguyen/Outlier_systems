@@ -100,7 +100,7 @@
     .sq-msg { stroke:var(--accent-strong); stroke-width:1.6; }
     .sq-warnline { stroke:var(--warn); stroke-width:1.6; }
     .sq-dash { stroke-dasharray:6 5; }
-    .sq-lab { fill:var(--text); font-size:12px; }
+    .sq-lab { fill:var(--text); }
     .sq-lab.warn { fill:var(--warn); font-weight:700; }
     .sq-state { fill:var(--muted); font-size:12px; font-style:italic; }
     .sq-note { fill:var(--warn-soft); stroke:var(--warn); }
@@ -134,7 +134,8 @@
         Revision notes and practice questions for systems software-engineering assessment work, covering
         five areas: databases and storage, operating systems with concurrency and runtimes, distributed
         systems, networking, and infrastructure. Each section has a definitions list, core-concept cards
-        with tradeoffs and pitfalls, ASCII diagrams where a picture helps, further-reading links, and a
+        with tradeoffs and pitfalls, diagrams where a picture helps (SVG sequence diagrams for the
+        protocol flows, an animated stack/heap walkthrough, text sketches for the rest), further-reading links, and a
         bank of practice questions with explanations in four formats: single-answer, select-all-that-apply,
         ordering chains, and complete-the-code — a short query, script, or config with a piece missing,
         where you pick the line that correctly completes it. Difficulty runs from recall up to applied
@@ -874,7 +875,7 @@ failure modes to design for:
         body.push(`<text x="${W / 2}" y="${y}" text-anchor="middle" class="sq-state">${esc(s.state)}</text>`);
         y += 30;
       } else {
-        const x1 = X(s.f), x2 = X(s.t), tip = x2 > x1 ? x2 - 8 : x2 + 8;
+        const x1 = X(s.f), x2 = X(s.t), tip = x2 > x1 ? x2 - 3 : x2 + 3;
         body.push(`<text x="${(x1 + x2) / 2}" y="${y - 6}" text-anchor="middle" class="sq-lab${s.warn ? " warn" : ""}" font-size="${fs}">${esc(s.l)}</text>`);
         body.push(`<line x1="${x1}" y1="${y}" x2="${tip}" y2="${y}" class="${s.warn ? "sq-warnline" : "sq-msg"}${s.d ? " sq-dash" : ""}" marker-end="url(#${s.warn ? "sqarw-w" : "sqarw"})"/>`);
         y += rowH;
