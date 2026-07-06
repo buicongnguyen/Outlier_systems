@@ -85,6 +85,14 @@
     .anim-caption { margin:12px 0 0; padding:9px 12px; border-left:3px solid var(--accent); background:var(--accent-soft); border-radius:0 6px 6px 0; font-size:14px; min-height:44px; }
     @media (max-width: 760px) { .anim-grid { grid-template-columns:1fr; } }
     .seq { margin:14px 0 0; padding:12px; background:var(--panel); border:1px solid var(--line); border-radius:8px; box-shadow:var(--shadow); overflow-x:auto; }
+    .cmp-table { width:100%; margin:14px 0 0; border-collapse:collapse; background:var(--panel); border:1px solid var(--line); font-size:14px; }
+    .cmp-table th, .cmp-table td { padding:9px 12px; border-bottom:1px solid var(--line); border-right:1px solid var(--line); text-align:left; vertical-align:top; }
+    .cmp-table th:last-child, .cmp-table td:last-child { border-right:none; }
+    .cmp-table th { color:var(--accent-strong); font-size:12.5px; text-transform:uppercase; letter-spacing:0.3px; }
+    .cmp-table td:first-child { font-weight:700; }
+    .cmp-table tr:last-child td { border-bottom:none; }
+    .cmp-table .bad { color:var(--warn); font-weight:700; }
+    .cmp-table .ok { color:var(--accent-strong); font-weight:700; }
     .seq svg { display:block; margin:0 auto; font-family:Arial,Helvetica,sans-serif; }
     .sq-actor { fill:var(--accent-soft); stroke:var(--accent); }
     .sq-actorlab { fill:var(--accent-strong); font-size:13px; font-weight:700; }
@@ -240,18 +248,20 @@ cost = read amplification + background compaction I/O</pre>
   crash before 2?         no COMMIT record → txn rolled back. atomicity.</pre>
 
       <p class="diagram-title">Isolation anomalies — who sees what</p>
-      <pre class="diagram">level             │ dirty read │ non-repeatable │ phantom │ write skew
-──────────────────┼────────────┼────────────────┼─────────┼───────────
-read uncommitted  │  possible  │    possible    │ possible│  possible
-read committed    │     no     │    possible    │ possible│  possible
-repeatable read / │     no     │       no       │ mostly  │  possible
-  snapshot (MVCC) │            │                │  no*    │  ← the trap
-serializable      │     no     │       no       │   no    │     no
-
-write skew: txn1 reads X,Y then writes X; txn2 reads X,Y then writes Y.
-both commit under snapshot isolation — combined result violates the
-invariant both checked. fix: SERIALIZABLE or SELECT ... FOR UPDATE.
-(* Postgres RR blocks phantoms; InnoDB RR mostly via gap locks)</pre>
+      <table class="cmp-table">
+        <thead><tr><th>level</th><th>dirty read</th><th>non-repeatable read</th><th>phantom</th><th>write skew</th></tr></thead>
+        <tbody>
+          <tr><td>read uncommitted</td><td class="bad">possible</td><td class="bad">possible</td><td class="bad">possible</td><td class="bad">possible</td></tr>
+          <tr><td>read committed</td><td class="ok">no</td><td class="bad">possible</td><td class="bad">possible</td><td class="bad">possible</td></tr>
+          <tr><td>repeatable read / snapshot (MVCC)</td><td class="ok">no</td><td class="ok">no</td><td>mostly no*</td><td class="bad">possible — the trap</td></tr>
+          <tr><td>serializable</td><td class="ok">no</td><td class="ok">no</td><td class="ok">no</td><td class="ok">no</td></tr>
+        </tbody>
+      </table>
+      <p class="section-note">
+        Write skew: txn1 reads X,Y then writes X; txn2 reads X,Y then writes Y — both commit under snapshot
+        isolation, and the combined result violates the invariant both checked. Fix: SERIALIZABLE or
+        <code>SELECT ... FOR UPDATE</code>. (* Postgres RR blocks phantoms; InnoDB RR mostly, via gap locks.)
+      </p>
 
       <p class="diagram-title">Replication lag — the read-your-own-writes sequence</p>
       <div class="seq" id="seq-replag"></div>
@@ -345,18 +355,7 @@ both takes A before B. no cycle can form.
 (also: try_lock with backoff, or one coarser lock)</pre>
 
       <p class="diagram-title">count++ is not atomic — the lost update</p>
-      <pre class="diagram">shared: count = 0        thread 1              thread 2
-                          load  r ← count(0)
-                                                load  r ← count(0)
-                          add   r ← 1
-                          store count ← 1
-                                                add   r ← 1
-                                                store count ← 1   ◀ overwrites!
-result: count == 1 after two increments — one update LOST.
-
-fixes:  mutex around the ++            (general, pessimistic)
-        atomic fetch_add(count, 1)     (single word, lock-free)
-        per-thread counters, sum later (no sharing at all — fastest)</pre>
+      <div class="seq" id="seq-lostupd"></div>
 
       <p class="diagram-title">Mutex lock/unlock — the call flow, fast path vs contended</p>
       <pre class="diagram">lock(m):
@@ -574,19 +573,7 @@ state machines written for you         (offload CPU work to a pool)</pre>
       </div>
 
       <p class="diagram-title">Raft — election and commit, term by term</p>
-      <pre class="diagram">5 nodes, term 3, leader L heartbeating ─────────────────────────▶ time
-  L ──╳ crash
-        follower F1: heartbeat timeout → term 4, candidate
-        F1 → RequestVote(term 4, my log is up-to-date)
-        F2, F3 vote yes (3/5 = majority) → F1 is LEADER term 4
-        (F with stale log would be refused votes → safety)
-
-commit path (leader F1):
-  client → F1: append x=7 to log[n]
-  F1 → AppendEntries(x=7) → F2 ✔  F3 ✔        majority holds it
-  F1: entry n COMMITTED → apply, reply client → tell followers
-old leader wakes with term 3 → sees term 4 → steps down (fencing).
-minority partition: no majority → no leader, no commits. no split brain.</pre>
+      <div class="seq" id="seq-raft"></div>
 
       <p class="diagram-title">Quorum overlap — why W + R &gt; N reads fresh data</p>
       <pre class="diagram">N = 5 replicas, W = 3, R = 3
@@ -600,18 +587,8 @@ W=1, R=1 (fast, available):  write hits A, read hits E → stale read OK?
 sloppy quorums / async repair push this further toward availability.</pre>
 
       <p class="diagram-title">2PC vs saga — atomic and blocking vs available and compensated</p>
-      <pre class="diagram">2PC:  coordinator      participants (order, payment, stock)
-        │ PREPARE? ──▶  each: lock, write undo/redo, vote YES/NO
-        │ ◀── all YES
-        │ COMMIT ────▶  apply, release locks
-      coordinator dies between phases ⇒ participants BLOCK, locks held ✗
-
-saga: order svc ──▶ payment svc ──▶ stock svc
-        T1 commit     T2 commit      T3 FAILS
-                                       │ compensate in reverse:
-        C1 cancel ◀── C2 refund  ◀────┘
-      no global locks, always available — but T1/T2 were VISIBLE
-      before compensation: design for "paid then refunded" states.</pre>
+      <div class="seq" id="seq-2pc"></div>
+      <div class="seq" id="seq-saga"></div>
 
       <p class="diagram-title">Outbox pattern — killing the dual-write, end to end</p>
       <div class="seq" id="seq-outbox"></div>
@@ -1007,6 +984,73 @@ failure modes to design for:
       { f: 1, t: 0, l: "answer — cached for the TTL at every layer" },
       { note: ["low TTL = fast failover but constant queries · high TTL = efficient but changes crawl out",
                "“DNS propagation” is nothing but caches expiring"] }
+    ]
+  });
+
+  seq("seq-lostupd", {
+    actors: ["Thread 1", "count (shared)", "Thread 2"], laneW: 310, margin: 105,
+    steps: [
+      { f: 0, t: 1, l: "load → register r1" },
+      { f: 1, t: 0, l: "0", d: 1 },
+      { f: 2, t: 1, l: "load → register r2" },
+      { f: 1, t: 2, l: "0  (same value — neither has written yet)", d: 1 },
+      { state: "each thread adds 1 in its own register: r1 = 1, r2 = 1" },
+      { f: 0, t: 1, l: "store 1" },
+      { f: 2, t: 1, l: "store 1 — silently overwrites thread 1's increment", warn: 1 },
+      { note: ["count == 1 after TWO increments — one update LOST (and the unsynchronized access is a data race: UB)",
+               "fixes: mutex around the ++ (general) · atomic fetch_add (single word, lock-free) ·",
+               "per-thread counters summed later (no sharing at all — fastest)"] }
+    ]
+  });
+
+  seq("seq-raft", {
+    actors: ["Client", "F1 → leader", "F2", "F3", "L (old leader)"], laneW: 190, margin: 95, fs: 11, boxW: 130,
+    steps: [
+      { state: "term 3: leader L heartbeats … then L crashes ✗ — F1's heartbeat timer expires first" },
+      { f: 1, t: 2, l: "RequestVote (term 4, my log is up to date)" },
+      { f: 1, t: 3, l: "RequestVote (term 4)" },
+      { f: 2, t: 1, l: "vote yes", d: 1 },
+      { f: 3, t: 1, l: "vote yes", d: 1 },
+      { state: "3 of 5 (own vote + 2) = majority → F1 is LEADER for term 4; stale-log candidates are refused votes" },
+      { f: 0, t: 1, l: "append x = 7" },
+      { f: 1, t: 2, l: "AppendEntries(x=7)" },
+      { f: 1, t: 3, l: "AppendEntries(x=7)" },
+      { f: 2, t: 1, l: "ok", d: 1 },
+      { f: 3, t: 1, l: "ok", d: 1 },
+      { state: "entry on a majority → COMMITTED: F1 applies it and tells followers" },
+      { f: 1, t: 0, l: "committed ✔", d: 1 },
+      { f: 4, t: 1, l: "heartbeat (stale term 3)", warn: 1 },
+      { f: 1, t: 4, l: "term 4 > 3 → step down (fencing)", d: 1 },
+      { note: ["minority partition: no majority → no leader, no commits — unavailable, but never split-brain"] }
+    ]
+  });
+
+  seq("seq-2pc", {
+    actors: ["Coordinator", "Order svc", "Payment svc", "Stock svc"], laneW: 235, margin: 100, fs: 11, boxW: 132,
+    steps: [
+      { f: 0, t: 1, l: "PREPARE? — lock, write undo/redo" },
+      { f: 0, t: 2, l: "PREPARE?" },
+      { f: 0, t: 3, l: "PREPARE?" },
+      { f: 1, t: 0, l: "YES", d: 1 },
+      { f: 2, t: 0, l: "YES", d: 1 },
+      { f: 3, t: 0, l: "YES", d: 1 },
+      { f: 0, t: 3, l: "COMMIT → all participants apply and release locks" },
+      { note: ["2PC is atomic but BLOCKING: if the coordinator dies between phases,",
+               "prepared participants sit holding locks until it returns ✗"] }
+    ]
+  });
+
+  seq("seq-saga", {
+    actors: ["Order svc", "Payment svc", "Stock svc"], laneW: 310, margin: 105,
+    steps: [
+      { state: "saga: each step is a LOCAL commit that triggers the next — no global locks" },
+      { f: 0, t: 1, l: "T1 committed → charge card (T2)" },
+      { f: 1, t: 2, l: "T2 committed → reserve stock (T3)" },
+      { f: 2, t: 1, l: "T3 FAILS → compensate in reverse", warn: 1 },
+      { f: 1, t: 0, l: "C2: refund payment", warn: 1, d: 1 },
+      { state: "C1: cancel order — consistent again, by compensation" },
+      { note: ["always available, but T1/T2 were VISIBLE before compensation:",
+               "the business must design for “paid then refunded” intermediate states"] }
     ]
   });
 })();
