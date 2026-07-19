@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="NPU driver and data path: PCIe and SoC resources, BAR and MMIO mapping, DMA, IOMMU isolation, command queues, doorbells, interrupts, completions and recovery.">
+  <title>NPU Driver, DMA, IOMMU and Interrupts</title>
+  <link rel="stylesheet" href="../styles.css">
+  <link rel="stylesheet" href="embedded.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="topbar embedded-topbar">
+    <div>
+      <p class="eyebrow">Embedded systems · branch 4</p>
+      <h1>NPU Drivers, DMA/IOMMU, Queues &amp; Interrupts</h1>
+    </div>
+    <nav aria-label="Site navigation">
+      <a href="../index.html">Main Hub</a>
+      <a href="index.html">Learning Tree</a>
+      <a href="#checkpoint">Quiz</a>
+    </nav>
+  </header>
+
+  <main id="main">
+    <nav class="breadcrumb" aria-label="Breadcrumb">
+      <a href="../index.html">Study Hub</a><span aria-hidden="true">/</span>
+      <a href="index.html">Embedded Systems &amp; NPU</a><span aria-hidden="true">/</span>
+      <span aria-current="page">NPU driver and data path</span>
+    </nav>
+
+    <div class="topic-layout">
+      <aside class="learning-tree" aria-label="Embedded systems learning tree">
+        <h2>Learning tree</h2>
+        <ul>
+          <li><a href="index.html"><span class="tree-kicker">Root</span>Embedded + NPU map</a></li>
+          <li><a href="rtos.html"><span class="tree-kicker">Branch 1</span>RTOS &amp; scheduling</a></li>
+          <li><a href="boot-chain.html"><span class="tree-kicker">Branch 2</span>Boot &amp; trust chain</a></li>
+          <li><a href="host-npu-startup.html"><span class="tree-kicker">Branch 3</span>Host + NPU startup</a></li>
+          <li><a href="npu-data-path.html" aria-current="page"><span class="tree-kicker">Branch 4</span>Driver &amp; data path</a></li>
+          <li><a href="end-to-end.html"><span class="tree-kicker">Capstone</span>First inference walkthrough</a></li>
+        </ul>
+      </aside>
+
+      <article class="topic-content">
+        <section class="hero-panel">
+          <p class="eyebrow">Safe bytes in, ordered commands, explicit completion</p>
+          <h2>The data path is a distributed protocol across CPU, memory fabric and NPU</h2>
+          <p>
+            Correctness depends on address translation, ownership, cache visibility, queue ordering, interrupt
+            handling and reset generation—not only the command format. The driver turns those rules into a safe API.
+          </p>
+          <div class="tag-row"><span class="topic-tag">BAR + MMIO</span><span class="topic-tag">DMA</span><span class="topic-tag">IOMMU</span><span class="topic-tag">Rings + doorbells</span><span class="topic-tag">MSI-X / IRQ</span></div>
+        </section>
+
+        <section class="section" aria-labelledby="outcomes">
+          <h2 id="outcomes">Learning outcomes</h2>
+          <div class="outcomes">
+            <article class="outcome"><strong>Map the layers</strong><p>Separate userspace runtime, kernel policy/driver, shared transport and NPU firmware responsibilities.</p></article>
+            <article class="outcome"><strong>Reason about addresses</strong><p>Distinguish CPU virtual, physical and device-visible DMA/I/O virtual addresses.</p></article>
+            <article class="outcome"><strong>Publish work safely</strong><p>Explain descriptor ownership, barriers, producer/consumer indices and doorbells.</p></article>
+            <article class="outcome"><strong>Recover safely</strong><p>Quiesce DMA, invalidate stale state and rebuild the transport across reset.</p></article>
+          </div>
+        </section>
+
+        <section class="section" aria-labelledby="stack">
+          <h2 id="stack">1. Software stack and responsibility</h2>
+          <div class="architecture-panel">
+            <section class="arch-zone">
+              <h3>Userspace</h3>
+              <ul><li>Graph compiler/runtime</li><li>Context and model lifecycle</li><li>Buffer import/export</li><li>Fences and error reporting</li></ul>
+            </section>
+            <section class="arch-zone interconnect"><h3>Kernel ABI</h3><p>ioctl · mmap · dma-buf · event/fence · telemetry</p></section>
+            <section class="arch-zone">
+              <h3>Kernel + firmware</h3>
+              <ul><li>Access control and isolation</li><li>DMA/IOMMU mappings</li><li>Queue and IRQ lifecycle</li><li>Power/reset/recovery</li></ul>
+            </section>
+          </div>
+          <div class="callout">
+            <h3>Validate at the trust boundary</h3>
+            <p>
+              Treat userspace sizes, offsets, handles and command references as untrusted. Check integer overflow,
+              object lifetime, mapping permissions, queue ownership and firmware-visible bounds before submission.
+            </p>
+          </div>
+        </section>
+
+        <section class="section" aria-labelledby="resources">
+          <h2 id="resources">2. PCIe/SoC resources and MMIO</h2>
+          <div class="concept-grid">
+            <article class="concept-card"><h3>PCI configuration space</h3><p>Enumeration reads IDs and capabilities, sizes BARs, assigns addresses and configures link/device features. The kernel PCI core owns this choreography.</p></article>
+            <article class="concept-card"><h3>BAR or platform MMIO</h3><p>The driver reserves and maps register apertures, then uses MMIO accessors. Ordinary pointer loads/stores may violate ordering or architecture rules.</p></article>
+            <article class="concept-card"><h3>Doorbell registers</h3><p>A write notifies the device that a producer index or queue state changed. Publish descriptors before ringing the doorbell.</p></article>
+            <article class="concept-card"><h3>Posted writes</h3><p>Some interconnect writes complete from the CPU's perspective before reaching the device. A defined readback may be needed when ordering is critical.</p></article>
+            <article class="concept-card"><h3>SoC clocks and resets</h3><p>Integrated devices may return bus errors or stale values if accessed while clocks are gated or reset remains asserted.</p></article>
+            <article class="concept-card"><h3>Runtime power</h3><p>Reference counts and autosuspend must cover every queue, mapping and in-flight command. Resume restores hardware state before access.</p></article>
+          </div>
+        </section>
+
+        <section class="section" aria-labelledby="dma">
+          <h2 id="dma">3. DMA address domains</h2>
+          <p class="section-lead">
+            A CPU pointer is meaningful inside one process or kernel mapping. An NPU issues bus transactions using a
+            device-visible address. The DMA API bridges those domains and hides platform-specific translation/coherency work.
+          </p>
+          <ol class="step-flow">
+            <li><strong>CPU virtual</strong><span>The address software dereferences; translated by CPU page tables.</span></li>
+            <li><strong>CPU physical</strong><span>The backing RAM address managed by the kernel's memory subsystem.</span></li>
+            <li><strong>DMA / IOVA</strong><span>The address programmed into the NPU descriptor or page table.</span></li>
+            <li><strong>IOMMU translation</strong><span>Maps the device-visible address to permitted physical pages with access permissions.</span></li>
+          </ol>
+          <div class="table-wrap">
+            <table class="compare-table">
+              <thead><tr><th>Mapping type</th><th>Typical use</th><th>Key rule</th></tr></thead>
+              <tbody>
+                <tr><td>Coherent / consistent</td><td>Command rings, completion rings, shared control blocks.</td><td>CPU and device see updates coherently, but ordering barriers can still be required.</td></tr>
+                <tr><td>Streaming</td><td>Input/output tensors or one-shot transfer buffers.</td><td>Map for a direction and lifetime, perform required sync, then unmap after the device is finished.</td></tr>
+                <tr><td>Imported shared buffer</td><td>Camera → NPU or NPU → display pipelines.</td><td>Track attachment, scatter-gather mappings, fences, ownership and per-device cache rules.</td></tr>
+                <tr><td>Device-local memory</td><td>Weights, microcode or scratch optimized for accelerator bandwidth.</td><td>Host access may require BAR windows or explicit copies; lifetime is tied to device/reset state.</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="callout danger">
+            <h3>Never unmap a buffer while the NPU can still access it</h3>
+            <p>Completion ordering, cancellation, reset and process teardown must all prove DMA has stopped before mappings and pages are released.</p>
+          </div>
+        </section>
+
+        <section class="section" aria-labelledby="iommu">
+          <h2 id="iommu">4. IOMMU isolation</h2>
+          <div class="concept-grid">
+            <article class="concept-card"><h3>Translation</h3><p>The device issues an I/O virtual address (IOVA); the IOMMU translates it to host physical pages, similar in purpose to CPU page tables.</p></article>
+            <article class="concept-card"><h3>Containment</h3><p>Only explicitly mapped pages are reachable. A faulty or hostile command cannot DMA across all RAM if the device and domain are configured correctly.</p></article>
+            <article class="concept-card"><h3>Per-context isolation</h3><p>PASID/SVA or separate domains can distinguish processes or guests, but hardware and driver support determine granularity.</p></article>
+            <article class="concept-card"><h3>Fault reporting</h3><p>Log stream/PASID, IOVA, access type and reason. Treat repeated faults as a context or device health event, not just a noisy warning.</p></article>
+            <article class="concept-card"><h3>TLB invalidation</h3><p>Changing mappings requires invalidating cached translations before pages are reused. Framework APIs enforce the correct ordering.</p></article>
+            <article class="concept-card"><h3>Not a complete sandbox</h3><p>MMIO, peer-to-peer paths, shared firmware, side channels and driver vulnerabilities remain. Isolation is a system property.</p></article>
+          </div>
+        </section>
+
+        <section class="section" aria-labelledby="queues">
+          <h2 id="queues">5. Command and completion queues</h2>
+          <p class="section-lead">A ring buffer is simple only after ownership and memory ordering are explicit.</p>
+          <pre class="code-block" aria-label="Example NPU submission sequence">host:
+  slot = submit_ring[producer % ring_size]
+  fill_descriptor(slot, opcode, buffers, fence, generation)
+  dma_write_barrier()           // descriptor visible before producer
+  shared_producer = producer + 1
+  mmio_write(DOORBELL, queue_id)
+
+NPU firmware:
+  observe producer
+  read descriptor
+  validate generation + bounds
+  execute command
+  write completion status
+  dma_write_barrier()           // status visible before completion producer
+  update completion_producer
+  raise interrupt or event</pre>
+          <div class="outcomes">
+            <article class="outcome"><strong>Producer owns free slots</strong><p>It must never overrun the consumer. Track wrap with monotonic counters or an explicit phase bit.</p></article>
+            <article class="outcome"><strong>Consumer owns published slots</strong><p>It reads a descriptor only after observing the ordered producer update.</p></article>
+            <article class="outcome"><strong>Generation rejects stale work</strong><p>Commands and completions from before reset cannot mutate the new queue instance.</p></article>
+            <article class="outcome"><strong>Backpressure is visible</strong><p>Block, return busy, queue in software or reject according to an explicit latency and memory policy.</p></article>
+          </div>
+        </section>
+
+        <section class="section" aria-labelledby="interrupts">
+          <h2 id="interrupts">6. Interrupts, polling and completions</h2>
+          <ol class="sequence-rail">
+            <li><strong>NPU writes completion</strong><p>Firmware records status and output visibility before updating the completion producer.</p></li>
+            <li><strong>NPU raises MSI-X/MSI or wired IRQ</strong><p>Multiple vectors may separate queues, faults and management events.</p></li>
+            <li><strong>Top-half handler acknowledges</strong><p>Read status, mask or clear the source as required, record work and wake deferred processing.</p></li>
+            <li><strong>Deferred handler drains completions</strong><p>Validate queue generation, signal fences, release mappings and wake clients outside hard-interrupt context.</p></li>
+            <li><strong>Load policy adapts</strong><p>Interrupt coalescing or polling reduces high-rate overhead but trades power and latency; measure the target workload.</p></li>
+          </ol>
+          <div class="callout warning">
+            <h3>Interrupt arrival is not enough</h3>
+            <p>Memory ordering must guarantee the completion record is visible before software treats the interrupt as proof of completion.</p>
+          </div>
+        </section>
+
+        <section class="section" aria-labelledby="recovery">
+          <h2 id="recovery">7. Reset and recovery protocol</h2>
+          <ol class="step-flow">
+            <li><strong>Freeze</strong><span>Reject submissions and mark contexts unhealthy.</span></li>
+            <li><strong>Quiesce</strong><span>Mask interrupts and stop or contain DMA before freeing anything.</span></li>
+            <li><strong>Capture</strong><span>Save fault registers, queue pointers, firmware logs and reset reason.</span></li>
+            <li><strong>Reset</strong><span>Use function-level or subsystem reset with bounded completion.</span></li>
+            <li><strong>Reload</strong><span>Authenticate firmware and repeat the ABI handshake.</span></li>
+            <li><strong>Rebuild</strong><span>Create new queues/mappings with a new boot generation.</span></li>
+            <li><strong>Notify</strong><span>Fail, replay or resubmit work only according to an idempotency policy.</span></li>
+          </ol>
+        </section>
+
+        <section class="section" aria-labelledby="diagnosis">
+          <h2 id="diagnosis">Data-path failure patterns</h2>
+          <div class="failure-grid">
+            <article class="failure-card"><h3>IOMMU translation fault</h3><p>Check IOVA, mapping direction, permissions, device/domain attachment, scatter-gather length and unmap timing.</p></article>
+            <article class="failure-card"><h3>Queue stalls without IRQ</h3><p>Inspect producer/consumer indices, barriers, doorbell reachability, interrupt mask/status and firmware task state.</p></article>
+            <article class="failure-card"><h3>Corrupt outputs</h3><p>Check tensor shape/stride, buffer bounds, cache sync, descriptor version, device address width and completion ordering.</p></article>
+            <article class="failure-card"><h3>Interrupt storm</h3><p>Confirm source acknowledgement, level-versus-edge semantics, stale status, error retry loop and moderation policy.</p></article>
+            <article class="failure-card"><h3>Use-after-reset</h3><p>Invalidate mappings, queue handles, fences and userspace contexts when the boot generation changes.</p></article>
+            <article class="failure-card"><h3>Teardown race</h3><p>Stop new ioctls, wait/cancel in-flight work, synchronize IRQs and workqueues, then destroy mappings and device state.</p></article>
+          </div>
+        </section>
+
+        <section id="checkpoint" class="section" aria-labelledby="checkpoint-title">
+          <h2 id="checkpoint-title">Driver and data-path checkpoint</h2>
+          <p class="section-lead">Choose one answer for each question. Explanations appear immediately after checking.</p>
+          <div class="quiz-shell" data-quiz="datapath"><noscript>Enable JavaScript to use the interactive quiz.</noscript></div>
+        </section>
+
+        <section class="section" aria-labelledby="sources">
+          <h2 id="sources">Primary references</h2>
+          <div class="source-grid">
+            <a class="source-card" href="https://docs.kernel.org/PCI/pci.html"><strong>Linux kernel · PCI drivers</strong><p>Initialization sequence, BAR resources, MMIO and driver lifecycle.</p></a>
+            <a class="source-card" href="https://docs.kernel.org/core-api/dma-api-howto.html"><strong>Linux kernel · DMA mapping guide</strong><p>CPU, physical and bus addresses; coherent and streaming mappings.</p></a>
+            <a class="source-card" href="https://docs.kernel.org/core-api/dma-api.html"><strong>Linux kernel · DMA API</strong><p>Detailed interfaces, directions, scatter-gather mappings and synchronization.</p></a>
+            <a class="source-card" href="https://docs.kernel.org/driver-api/vfio.html"><strong>Linux kernel · VFIO</strong><p>IOMMU-protected userspace device access, regions and interrupt notification.</p></a>
+            <a class="source-card" href="https://devicetree-specification.readthedocs.io/en/stable/devicetree-basics.html#interrupts-and-interrupt-mapping"><strong>Devicetree · Interrupt mapping</strong><p>Interrupt domains, parent relationships and bus-to-controller mappings.</p></a>
+          </div>
+        </section>
+
+        <nav class="page-next" aria-label="Learning path navigation">
+          <a href="host-npu-startup.html">← Host + NPU startup</a>
+          <a href="end-to-end.html">Next: end-to-end case study →</a>
+        </nav>
+      </article>
+    </div>
+  </main>
+
+  <footer><p>Branch 4 of 4 · NPU driver ownership, protected memory and queue transport.</p></footer>
+  <script src="quiz.js"></script>
+  <script src="../theme-toggle.js"></script>
+</body>
+</html>

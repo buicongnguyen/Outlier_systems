@@ -1,0 +1,279 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="End-to-end host and NPU system walkthrough from Boot ROM and secure boot through Linux, NPU firmware, DMA/IOMMU, runtime, model loading and first inference.">
+  <title>Host + NPU: Cold Boot to First Inference</title>
+  <link rel="stylesheet" href="../styles.css">
+  <link rel="stylesheet" href="embedded.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="topbar embedded-topbar">
+    <div>
+      <p class="eyebrow">Embedded systems · capstone</p>
+      <h1>Host + NPU: Cold Boot to First Inference</h1>
+    </div>
+    <nav aria-label="Site navigation">
+      <a href="../index.html">Main Hub</a>
+      <a href="index.html">Learning Tree</a>
+      <a href="#checkpoint">Quiz</a>
+    </nav>
+  </header>
+
+  <main id="main">
+    <nav class="breadcrumb" aria-label="Breadcrumb">
+      <a href="../index.html">Study Hub</a><span aria-hidden="true">/</span>
+      <a href="index.html">Embedded Systems &amp; NPU</a><span aria-hidden="true">/</span>
+      <span aria-current="page">End-to-end case study</span>
+    </nav>
+
+    <div class="topic-layout">
+      <aside class="learning-tree" aria-label="Embedded systems learning tree">
+        <h2>Learning tree</h2>
+        <ul>
+          <li><a href="index.html"><span class="tree-kicker">Root</span>Embedded + NPU map</a></li>
+          <li><a href="rtos.html"><span class="tree-kicker">Branch 1</span>RTOS &amp; scheduling</a></li>
+          <li><a href="boot-chain.html"><span class="tree-kicker">Branch 2</span>Boot &amp; trust chain</a></li>
+          <li><a href="host-npu-startup.html"><span class="tree-kicker">Branch 3</span>Host + NPU startup</a></li>
+          <li><a href="npu-data-path.html"><span class="tree-kicker">Branch 4</span>Driver &amp; data path</a></li>
+          <li><a href="end-to-end.html" aria-current="page"><span class="tree-kicker">Capstone</span>First inference walkthrough</a></li>
+        </ul>
+      </aside>
+
+      <article class="topic-content">
+        <section class="hero-panel">
+          <p class="eyebrow">A concrete teaching system</p>
+          <h2>Eleven gates from reset to a trusted inference result</h2>
+          <p>
+            This case study uses an ARM64 Linux host with an integrated NPU whose control processor runs a small
+            RTOS. The exact registers are fictional; the ownership, trust, memory and recovery invariants are realistic.
+          </p>
+          <div class="tag-row"><span class="topic-tag">ARM64 + U-Boot</span><span class="topic-tag">Integrated NPU</span><span class="topic-tag">NPU RTOS</span><span class="topic-tag">Shared IOMMU</span><span class="topic-tag">Vision inference</span></div>
+        </section>
+
+        <section class="section" aria-labelledby="profile">
+          <h2 id="profile">System profile: EdgeVision-A</h2>
+          <div class="architecture-panel">
+            <section class="arch-zone">
+              <h3>Host side</h3>
+              <ul>
+                <li>ARM64 application CPUs</li>
+                <li>Boot ROM → SPL → U-Boot</li>
+                <li>Secure Linux + initramfs</li>
+                <li>NPU platform driver</li>
+                <li>Userspace compiler/runtime</li>
+              </ul>
+            </section>
+            <section class="arch-zone interconnect">
+              <h3>SoC fabric</h3>
+              <p>mailbox · SMMU/IOMMU · shared DDR · IRQs · clocks/resets</p>
+            </section>
+            <section class="arch-zone">
+              <h3>NPU side</h3>
+              <ul>
+                <li>Control microcontroller</li>
+                <li>Signed RTOS firmware</li>
+                <li>Command scheduler task</li>
+                <li>DMA/tensor engines</li>
+                <li>Watchdog and crash log</li>
+              </ul>
+            </section>
+          </div>
+          <div class="callout warning">
+            <h3>Case-study policy choices</h3>
+            <p>
+              Boot ROM anchors the host chain. U-Boot verifies a signed FIT containing kernel, DTB and initramfs.
+              The host driver accepts NPU firmware only when its signed manifest chains to an accelerator-update key.
+              These are deliberate system policies—not automatic properties of Linux or every NPU.
+            </p>
+          </div>
+        </section>
+
+        <section class="section" aria-labelledby="overview">
+          <h2 id="overview">The complete sequence</h2>
+          <ol class="step-flow">
+            <li><strong>Boot ROM</strong><span>Authenticate SPL from the selected boot slot.</span></li>
+            <li><strong>Secure boot</strong><span>Extend trust and enforce version/recovery policy.</span></li>
+            <li><strong>U-Boot</strong><span>Verify FIT and pass kernel + DTB + initramfs.</span></li>
+            <li><strong>Host kernel</strong><span>Initialize Linux, memory, SMMU, buses and userspace.</span></li>
+            <li><strong>Device discovery</strong><span>Instantiate the NPU from device tree resources.</span></li>
+            <li><strong>NPU driver</strong><span>Own power, reset, MMIO, IRQs and DMA isolation.</span></li>
+            <li><strong>NPU firmware</strong><span>Authenticate, load, start RTOS and handshake.</span></li>
+            <li><strong>DMA/IOMMU</strong><span>Create protected queue and tensor mappings.</span></li>
+            <li><strong>Runtime</strong><span>Create a context and compile the graph.</span></li>
+            <li><strong>Model loading</strong><span>Upload constants and prepare executable state.</span></li>
+            <li><strong>Inference</strong><span>Submit, execute, complete and validate output.</span></li>
+          </ol>
+        </section>
+
+        <section class="section" aria-labelledby="stage-details">
+          <h2 id="stage-details">Stage-by-stage contracts</h2>
+
+          <h3 class="sub">Gate 1 · Boot ROM</h3>
+          <div class="variant-grid">
+            <article class="variant-card"><h3>Actor and action</h3><p>Immutable SoC ROM samples lifecycle fuses and boot straps, selects A or recovery media, reads the SPL manifest and verifies its signature/key policy.</p></article>
+            <article class="variant-card"><h3>Invariant after handoff</h3><p>The first mutable code is authorized for this product and security version; SRAM load ranges and entry point are valid.</p></article>
+            <article class="variant-card"><h3>Evidence</h3><p>ROM status/failure code, selected slot, measured hash, boot counter and a bounded transition into SPL.</p></article>
+          </div>
+
+          <h3 class="sub">Gate 2 · Secure loader chain</h3>
+          <div class="variant-grid">
+            <article class="variant-card"><h3>Actor and action</h3><p>SPL initializes DRAM, verifies U-Boot proper and transfers control. Each signed manifest carries a security version and allowed next-stage key.</p></article>
+            <article class="variant-card"><h3>Invariant after handoff</h3><p>DRAM is usable, the richer bootloader is authenticated, and an old vulnerable image cannot bypass the monotonic rollback policy.</p></article>
+            <article class="variant-card"><h3>Failure boundary</h3><p>On authentication or DRAM failure, enter a restricted recovery path that accepts only correctly signed update packages.</p></article>
+          </div>
+
+          <h3 class="sub">Gate 3 · U-Boot OS selection</h3>
+          <div class="variant-grid">
+            <article class="variant-card"><h3>Actor and action</h3><p>U-Boot selects the candidate slot, verifies the FIT configuration and loads kernel, DTB and initramfs without overlap.</p></article>
+            <article class="variant-card"><h3>Invariant after handoff</h3><p>Linux receives an authenticated hardware description, command line, initramfs and correct architecture entry state.</p></article>
+            <article class="variant-card"><h3>Evidence</h3><p>FIT configuration name, verified key identifier, image addresses/sizes and boot-attempt state stored for A/B rollback.</p></article>
+          </div>
+
+          <h3 class="sub">Gate 4 · Linux host initialization</h3>
+          <div class="variant-grid">
+            <article class="variant-card"><h3>Actor and action</h3><p>Linux establishes page tables, scheduler, interrupts and timekeeping; initializes SMMU, power domains, clocks and the platform bus; then starts PID 1.</p></article>
+            <article class="variant-card"><h3>Invariant after handoff</h3><p>Host memory protection works, required resource providers are ready and userspace can start without exposing the NPU yet.</p></article>
+            <article class="variant-card"><h3>Evidence</h3><p>Early console, memory/reserved-region map, SMMU probe, initcall timing, rootfs mount and boot-success marker after health checks.</p></article>
+          </div>
+
+          <h3 class="sub">Gate 5 · NPU discovery</h3>
+          <pre class="code-block" aria-label="Simplified EdgeVision NPU device tree">npu@4a000000 {
+    compatible = "edgevision,npu-a1";
+    reg = &lt;0x0 0x4a000000 0x0 0x10000&gt;;
+    interrupts = &lt;0 92 4&gt;, &lt;0 93 4&gt;;
+    clocks = &lt;&amp;npu_core_clk&gt;, &lt;&amp;npu_bus_clk&gt;;
+    resets = &lt;&amp;resetc 7&gt;;
+    power-domains = &lt;&amp;pd_npu&gt;;
+    iommus = &lt;&amp;smmu 0x34&gt;;
+    memory-region = &lt;&amp;npu_fw&gt;, &lt;&amp;npu_crashlog&gt;;
+    firmware-name = "edgevision/npu-a1-fw.bin";
+};</pre>
+          <div class="callout"><h3>Invariant</h3><p>The platform driver has an authoritative description of MMIO, IRQ, power/reset/clock, IOMMU and reserved-memory resources. A successful DT match does not prove the NPU processor is running.</p></div>
+
+          <h3 class="sub">Gate 6 · Driver ownership</h3>
+          <ol class="sequence-rail">
+            <li><strong>Power domain on; clocks prepared</strong><p>Do not access registers until the interconnect path is live.</p></li>
+            <li><strong>Reserve/map MMIO; keep NPU reset asserted</strong><p>Read a hardware ID and capability register to verify the programming interface.</p></li>
+            <li><strong>Attach SMMU and set DMA mask</strong><p>No workload-facing DMA occurs before the isolation boundary exists.</p></li>
+            <li><strong>Request management and completion IRQs</strong><p>Keep sources masked until queue memory and handlers are initialized.</p></li>
+            <li><strong>Enter LOADING state</strong><p>Userspace sees no usable accelerator node until firmware reaches Ready.</p></li>
+          </ol>
+
+          <h3 class="sub">Gate 7 · NPU firmware and RTOS</h3>
+          <div class="architecture-panel">
+            <section class="arch-zone"><h3>Host driver</h3><ul><li>Request and authenticate image</li><li>Copy sections to reserved memory</li><li>Program boot address</li><li>Release reset</li><li>Wait for HELLO</li></ul></section>
+            <section class="arch-zone interconnect"><h3>Bootstrap</h3><p>boot mailbox · shared control page · management IRQ</p></section>
+            <section class="arch-zone"><h3>NPU RTOS</h3><ul><li>Early hardware init</li><li>Queue scheduler task</li><li>DMA/fault service task</li><li>Low-priority telemetry</li><li>Watchdog supervisor</li></ul></section>
+          </div>
+          <div class="callout warning"><h3>RTOS priority design</h3><p>Fault containment and time-critical DMA/engine service outrank command admission; telemetry never blocks control work. The watchdog is fed only after critical-task progress is confirmed.</p></div>
+
+          <h3 class="sub">Gate 8 · DMA/IOMMU and queues</h3>
+          <ol class="sequence-rail">
+            <li><strong>Allocate coherent submission/completion rings</strong><p>Store monotonic producer/consumer counters, protocol version and boot generation in a shared queue table.</p></li>
+            <li><strong>Map tensor buffers with least privilege</strong><p>Inputs are device-readable, outputs are device-writable, and unrelated host pages are absent from the NPU domain.</p></li>
+            <li><strong>Publish queue-table IOVA</strong><p>A barrier precedes the bootstrap mailbox or doorbell that exposes the address to firmware.</p></li>
+            <li><strong>Enable interrupts after state is valid</strong><p>Clear stale status first, then unmask management, completion and fault sources.</p></li>
+          </ol>
+
+          <h3 class="sub">Gate 9 · Userspace runtime</h3>
+          <div class="variant-grid">
+            <article class="variant-card"><h3>Create context</h3><p>The runtime opens the device, negotiates kernel ABI/capabilities and obtains a context isolated from other processes.</p></article>
+            <article class="variant-card"><h3>Compile graph</h3><p>Supported operators are partitioned for the NPU, tensor layouts and quantization are selected, and fallback policy is explicit.</p></article>
+            <article class="variant-card"><h3>Allocate/import buffers</h3><p>Camera input, host staging and output buffers are imported with fences and appropriate IOMMU permissions.</p></article>
+          </div>
+
+          <h3 class="sub">Gate 10 · Model loading</h3>
+          <ol class="step-flow">
+            <li><strong>Validate artifact</strong><span>Check compiler/runtime/firmware compatibility and model signature policy.</span></li>
+            <li><strong>Allocate state</strong><span>Reserve device-local and shared memory with alignment and size bounds.</span></li>
+            <li><strong>Upload constants</strong><span>Transfer weights and microcode; verify checksums where the device protocol supports it.</span></li>
+            <li><strong>Create executable</strong><span>Firmware returns a generation-scoped handle; stale handles cannot cross reset.</span></li>
+          </ol>
+
+          <h3 class="sub">Gate 11 · First inference</h3>
+          <ol class="sequence-rail">
+            <li><strong>Acquire and fence input</strong><p>Wait until the camera/producer has finished writing; synchronize ownership for the NPU.</p></li>
+            <li><strong>Publish command descriptor</strong><p>Reference model handle, input/output IOVAs, dimensions, deadline class and completion fence; then ring the doorbell.</p></li>
+            <li><strong>Firmware schedules engines</strong><p>The RTOS validates generation/bounds, performs local admission and programs DMA/tensor engines.</p></li>
+            <li><strong>Completion is ordered</strong><p>Firmware writes status/output visibility, advances the completion ring and raises the completion IRQ.</p></li>
+            <li><strong>Host finalizes</strong><p>The driver drains completions, signals the fence, releases temporary mappings and reports timing/errors to the runtime.</p></li>
+            <li><strong>Application validates output</strong><p>Check status, tensor metadata and an application-level plausibility/quality condition before consuming the result.</p></li>
+          </ol>
+        </section>
+
+        <section class="section" aria-labelledby="observability">
+          <h2 id="observability">One timeline across all processors</h2>
+          <p class="section-lead">Use a common boot ID and monotonic timestamp domain where possible. Record stage transitions, not only free-form logs.</p>
+          <div class="table-wrap">
+            <table class="compare-table">
+              <thead><tr><th>Milestone</th><th>Required evidence</th><th>Timeout owner</th></tr></thead>
+              <tbody>
+                <tr><td>Host image authenticated</td><td>Signer/key ID, security version, selected slot</td><td>Boot ROM / loader</td></tr>
+                <tr><td>Linux userspace healthy</td><td>Boot ID, rootfs slot, critical-service health</td><td>Service manager / platform watchdog</td></tr>
+                <tr><td>NPU firmware Ready</td><td>Build ID, ABI, capabilities, boot generation</td><td>NPU kernel driver</td></tr>
+                <tr><td>Queue online</td><td>Queue IDs, depth, IOVA range, IRQ vector</td><td>Driver/runtime handshake</td></tr>
+                <tr><td>Model executable ready</td><td>Artifact hash, compiler version, memory footprint</td><td>Userspace runtime</td></tr>
+                <tr><td>First inference complete</td><td>Submission/completion ID, latency breakdown, status</td><td>Application/runtime</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="section" aria-labelledby="pcie-variant">
+          <h2 id="pcie-variant">How the sequence changes for a discrete PCIe NPU</h2>
+          <div class="concept-grid">
+            <article class="concept-card"><h3>Discovery moves to PCIe</h3><p>Link training and configuration-space enumeration replace DT platform-device creation; a DT/ACPI host bridge still describes the root complex.</p></article>
+            <article class="concept-card"><h3>Resources become BARs/vectors</h3><p>BAR assignment and MSI/MSI-X allocation replace fixed SoC MMIO/IRQ descriptions for the NPU function.</p></article>
+            <article class="concept-card"><h3>Reset semantics change</h3><p>Use device-specific reset, function-level reset, secondary-bus reset or power cycle according to hardware guarantees and peer impact.</p></article>
+            <article class="concept-card"><h3>Firmware path may be internal</h3><p>The device may first boot its own ROM/flash, then accept a host firmware update or runtime image through a management channel.</p></article>
+            <article class="concept-card"><h3>IOMMU remains central</h3><p>PCIe Requester IDs identify DMA streams; isolation and mapping lifetime rules remain even when discovery differs.</p></article>
+            <article class="concept-card"><h3>Surprise removal is possible</h3><p>Hotplug or link loss requires lifetime-safe teardown, failed fences and no continued MMIO access to the removed function.</p></article>
+          </div>
+        </section>
+
+        <section class="section" aria-labelledby="recovery">
+          <h2 id="recovery">Production recovery path</h2>
+          <ol class="step-flow">
+            <li><strong>Detect</strong><span>Watchdog expiry, queue timeout, fault IRQ, IOMMU fault or link loss.</span></li>
+            <li><strong>Fence</strong><span>Block new submissions and mark all contexts with the failing generation.</span></li>
+            <li><strong>Quiesce</strong><span>Stop engines or contain DMA; synchronize interrupts and deferred work.</span></li>
+            <li><strong>Capture</strong><span>Preserve firmware log, queue heads, fault registers and model/context identifiers.</span></li>
+            <li><strong>Reset + reload</strong><span>Repeat authenticated firmware startup and capability handshake.</span></li>
+            <li><strong>Rebuild</strong><span>Create new mappings, queues, model handles and fences under a new generation.</span></li>
+            <li><strong>Report</strong><span>Fail or replay requests according to idempotency and deadline policy; never silently lose work.</span></li>
+          </ol>
+        </section>
+
+        <section id="checkpoint" class="section" aria-labelledby="checkpoint-title">
+          <h2 id="checkpoint-title">End-to-end checkpoint</h2>
+          <p class="section-lead">Choose one answer for each question. Explanations appear immediately after checking.</p>
+          <div class="quiz-shell" data-quiz="endtoend"><noscript>Enable JavaScript to use the interactive quiz.</noscript></div>
+        </section>
+
+        <section class="section" aria-labelledby="sources">
+          <h2 id="sources">Primary references used across the system</h2>
+          <div class="source-grid">
+            <a class="source-card" href="https://docs.u-boot.org/en/latest/usage/fit/verified-boot.html"><strong>U-Boot · Verified Boot</strong><p>Signed firmware chains and trusted key handling.</p></a>
+            <a class="source-card" href="https://devicetree-specification.readthedocs.io/en/stable/devicetree-basics.html"><strong>Devicetree Specification</strong><p>Hardware nodes, resources, matching and interrupt relationships.</p></a>
+            <a class="source-card" href="https://docs.kernel.org/staging/remoteproc.html"><strong>Linux kernel · remoteproc</strong><p>Remote firmware lifecycle and crash recovery model.</p></a>
+            <a class="source-card" href="https://docs.kernel.org/core-api/dma-api-howto.html"><strong>Linux kernel · DMA mapping guide</strong><p>Device-visible addresses, mappings, coherency and lifetime.</p></a>
+            <a class="source-card" href="https://www.freertos.org/Documentation/01-FreeRTOS-quick-start/01-Beginners-guide/01-RTOS-fundamentals"><strong>FreeRTOS · RTOS fundamentals</strong><p>Fixed-priority scheduling and real-time task behavior.</p></a>
+          </div>
+        </section>
+
+        <nav class="page-next" aria-label="Learning path navigation">
+          <a href="npu-data-path.html">← NPU driver and data path</a>
+          <a href="index.html">Return to learning tree →</a>
+        </nav>
+      </article>
+    </div>
+  </main>
+
+  <footer><p>Capstone · A complete host + NPU lifecycle from reset through recovery.</p></footer>
+  <script src="quiz.js"></script>
+  <script src="../theme-toggle.js"></script>
+</body>
+</html>

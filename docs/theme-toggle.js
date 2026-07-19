@@ -5,6 +5,27 @@
   const style = document.createElement("style");
   style.textContent = `
     :root { color-scheme: dark; }
+    :root[data-site-theme="dark"] {
+      color-scheme: dark;
+      --bg: #12161d; --bg2: #161c25; --bg-alt: #161c25;
+      --bg-top: #12161d; --bg-bottom: #0f1319; --bg-strong: #252e3c;
+      --page: #12161d; --paper: #1d2430; --canvas: #12161d; --canvas-2: #161c25;
+      --surface: #1d2430; --surface-2: #252e3c; --card: #1d2430;
+      --panel: #1d2430; --panel2: #252e3c; --panel-bg: #1d2430;
+      --panel-light: #252e3c; --panel-soft: #252e3c; --panel-strong: #333c4b;
+      --shell: #1d2430; --shell-2: #252e3c; --shell-bg: #1d2430;
+      --ink: #edf2f7; --text: #edf2f7; --panel-text: #edf2f7; --head-ink: #f8fafc;
+      --muted: #b5bfcb; --text-muted: #b5bfcb; --text-soft: #98a6b7; --ink-dim: #98a6b7;
+      --line: #333c4b; --border: #333c4b; --border-strong: #526174;
+      --panel-border: #333c4b; --card-border: #333c4b;
+      --accent: #7ad6a2; --accent-strong: #a5e8c0; --accent-soft: #173626;
+      --warn: #f1ca71; --warn-soft: #392a12;
+      --shadow: none; --soft-shadow: none;
+      --code: #161c25; --code-ink: #edf2f7; --row-alt: #161c25;
+      --hover-bg: #252e3c; --summary-hover: #252e3c; --chip-bg: #252e3c;
+      --graph-surface: #161c25; --graph-node: #1d2430; --graph-node-text: #edf2f7;
+      --graph-edge: #7f8ea3; --page-bg-color: #12161d;
+    }
     :root[data-site-theme="light"] {
       color-scheme: light;
       --bg: #f4f7fb; --bg2: #e8eef6; --bg-alt: #e8eef6;
@@ -25,6 +46,7 @@
       --graph-surface: #f8fafc; --graph-node: #ffffff; --graph-node-text: #172033;
       --graph-edge: #7b8da4; --page-bg-color: #f4f7fb;
     }
+    :root[data-site-theme="dark"] body { background-color: var(--bg, #12161d); color: var(--text, #edf2f7); }
     :root[data-site-theme="light"] body { background-color: var(--bg, #f4f7fb); color: var(--text, #172033); }
     .site-theme-toggle {
       position: fixed; top: max(12px, env(safe-area-inset-top)); right: max(12px, env(safe-area-inset-right));

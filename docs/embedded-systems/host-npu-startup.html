@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Host CPU and NPU startup: PCIe and SoC discovery, driver binding, clocks, resets, power, firmware loading, remote processor control and ABI handshake.">
+  <title>Host CPU and NPU Startup</title>
+  <link rel="stylesheet" href="../styles.css">
+  <link rel="stylesheet" href="embedded.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="topbar embedded-topbar">
+    <div>
+      <p class="eyebrow">Embedded systems · branch 3</p>
+      <h1>Host CPU + NPU Startup &amp; Firmware Loading</h1>
+    </div>
+    <nav aria-label="Site navigation">
+      <a href="../index.html">Main Hub</a>
+      <a href="index.html">Learning Tree</a>
+      <a href="#checkpoint">Quiz</a>
+    </nav>
+  </header>
+
+  <main id="main">
+    <nav class="breadcrumb" aria-label="Breadcrumb">
+      <a href="../index.html">Study Hub</a><span aria-hidden="true">/</span>
+      <a href="index.html">Embedded Systems &amp; NPU</a><span aria-hidden="true">/</span>
+      <span aria-current="page">Host + NPU startup</span>
+    </nav>
+
+    <div class="topic-layout">
+      <aside class="learning-tree" aria-label="Embedded systems learning tree">
+        <h2>Learning tree</h2>
+        <ul>
+          <li><a href="index.html"><span class="tree-kicker">Root</span>Embedded + NPU map</a></li>
+          <li><a href="rtos.html"><span class="tree-kicker">Branch 1</span>RTOS &amp; scheduling</a></li>
+          <li><a href="boot-chain.html"><span class="tree-kicker">Branch 2</span>Boot &amp; trust chain</a></li>
+          <li><a href="host-npu-startup.html" aria-current="page"><span class="tree-kicker">Branch 3</span>Host + NPU startup</a></li>
+          <li><a href="npu-data-path.html"><span class="tree-kicker">Branch 4</span>Driver &amp; data path</a></li>
+          <li><a href="end-to-end.html"><span class="tree-kicker">Capstone</span>First inference walkthrough</a></li>
+        </ul>
+      </aside>
+
+      <article class="topic-content">
+        <section class="hero-panel">
+          <p class="eyebrow">Discovery → ownership → firmware Ready</p>
+          <h2>Enumeration proves the device exists; startup proves it can execute</h2>
+          <p>
+            Host startup must discover the NPU, bind the correct driver, acquire power/reset/clock and memory
+            resources, load authorized firmware, release the remote processor and negotiate a compatible ABI.
+          </p>
+          <div class="tag-row"><span class="topic-tag">PCIe</span><span class="topic-tag">SoC platform device</span><span class="topic-tag">Firmware loader</span><span class="topic-tag">remoteproc</span><span class="topic-tag">ABI handshake</span></div>
+        </section>
+
+        <section class="section" aria-labelledby="outcomes">
+          <h2 id="outcomes">Learning outcomes</h2>
+          <div class="outcomes">
+            <article class="outcome"><strong>Separate variants</strong><p>Explain dynamic PCIe enumeration versus device-tree/ACPI-described integrated IP.</p></article>
+            <article class="outcome"><strong>Trace probe</strong><p>Follow matching, resource acquisition, DMA capability, interrupts and runtime power setup.</p></article>
+            <article class="outcome"><strong>Load firmware safely</strong><p>Identify who authenticates, who copies, who releases reset and who reports Ready.</p></article>
+            <article class="outcome"><strong>Diagnose by gate</strong><p>Use PCI/DT, driver, power, firmware and mailbox evidence to isolate the failed boundary.</p></article>
+          </div>
+        </section>
+
+        <section class="section" aria-labelledby="discovery">
+          <h2 id="discovery">1. Two discovery paths</h2>
+          <div class="table-wrap">
+            <table class="compare-table">
+              <thead><tr><th>Stage</th><th>Integrated SoC NPU</th><th>Discrete PCIe NPU</th></tr></thead>
+              <tbody>
+                <tr><td>Physical discovery</td><td>Not usually self-enumerating. Firmware describes the IP block as a platform device.</td><td>PCIe link trains; configuration-space enumeration finds vendor/device/class IDs.</td></tr>
+                <tr><td>Resources</td><td>DT/ACPI supplies MMIO, IRQs, clocks, resets, power domains, IOMMU and reserved memory.</td><td>PCI core assigns BARs and interrupt vectors; ACPI/firmware may still describe power and IOMMU topology.</td></tr>
+                <tr><td>Driver match</td><td><code>compatible</code> or ACPI ID matches a platform driver.</td><td>Vendor/device ID table matches a registered <code>pci_driver</code>.</td></tr>
+                <tr><td>Firmware transfer</td><td>Often copied into reserved/Tightly Coupled Memory, then a remote core is released from reset.</td><td>May stream through a management BAR, bootstrap DMA, device flash or a vendor mailbox.</td></tr>
+                <tr><td>Power lifecycle</td><td>Linux clock/reset/regulator/power-domain frameworks coordinate shared SoC resources.</td><td>PCI power states, function-level reset and device-specific controllers coordinate lifecycle.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="section" aria-labelledby="probe">
+          <h2 id="probe">2. Driver probe establishes ownership</h2>
+          <ol class="sequence-rail">
+            <li><strong>Match the device</strong><p>The bus finds an ID match and invokes the driver's probe path. A match says the driver understands the programming interface, not that the device is healthy.</p></li>
+            <li><strong>Enable resources</strong><p>Enable the PCI function or runtime-power domain, acquire regulators/clocks, deassert prerequisite resets and reserve MMIO regions.</p></li>
+            <li><strong>Map control registers</strong><p>Map BAR or platform MMIO apertures with kernel helpers. Use MMIO accessors and respect posted-write/readback requirements.</p></li>
+            <li><strong>Set DMA capabilities</strong><p>Negotiate the coherent and streaming DMA mask. Attach the device to the intended IOMMU domain before accepting workloads.</p></li>
+            <li><strong>Allocate interrupts</strong><p>Request MSI/MSI-X or wired IRQs, establish handlers and keep interrupts masked until queues and status state are valid.</p></li>
+            <li><strong>Create software state</strong><p>Initialize locks, state machine, reset generation, telemetry and lifetime references before exposing userspace interfaces.</p></li>
+          </ol>
+          <div class="callout warning">
+            <h3>Probe ordering may be deferred</h3>
+            <p>An integrated NPU driver may wait for clocks, regulators, an IOMMU, reserved memory or another firmware provider. Deferred probe is a dependency signal, not automatically a driver bug.</p>
+          </div>
+        </section>
+
+        <section class="section" aria-labelledby="firmware">
+          <h2 id="firmware">3. Firmware loading and remote start</h2>
+          <p class="section-lead">
+            The Linux firmware API locates image bytes. Device-specific code still controls authentication policy,
+            placement, cache maintenance, reset sequencing, entry point and health monitoring.
+          </p>
+          <ol class="step-flow">
+            <li><strong>Request image</strong><span>Locate the named firmware from built-in data, cache, filesystem or configured fallback.</span></li>
+            <li><strong>Validate container</strong><span>Check bounds, architecture, sections, manifest, ABI version and cryptographic policy.</span></li>
+            <li><strong>Quiesce NPU</strong><span>Hold reset, stop DMA, mask interrupts and make the previous generation inaccessible.</span></li>
+            <li><strong>Place firmware</strong><span>Copy sections to device memory or create DMA mappings the bootstrap engine can read.</span></li>
+            <li><strong>Program boot state</strong><span>Set entry point, page tables, queue bootstrap address, clocks and watchdog policy.</span></li>
+            <li><strong>Release reset</strong><span>Start the remote processor and wait for a bounded boot-status transition.</span></li>
+            <li><strong>Handshake</strong><span>Exchange magic, ABI version, capabilities, queue counts, address width and coherency flags.</span></li>
+            <li><strong>Mark Ready</strong><span>Only now expose a usable accelerator context to the runtime.</span></li>
+          </ol>
+          <div class="callout danger">
+            <h3>Host trust does not automatically cover NPU firmware</h3>
+            <p>
+              The NPU image must be included in an authenticated host manifest or verified by an NPU-local immutable
+              root of trust. Otherwise a secure host can still start unauthorized accelerator code with DMA capability.
+            </p>
+          </div>
+        </section>
+
+        <section class="section" aria-labelledby="remoteproc">
+          <h2 id="remoteproc">4. A remote-processor lifecycle model</h2>
+          <p class="section-lead">
+            Linux's remoteproc framework illustrates a useful separation: a common core parses firmware and models
+            lifecycle, while platform operations implement power, load, start, stop, kick and crash handling.
+          </p>
+          <div class="concept-grid">
+            <article class="concept-card"><h3>Offline</h3><p>Clocks may be gated, reset asserted and no DMA permitted. Software retains metadata but not a live queue contract.</p></article>
+            <article class="concept-card"><h3>Loading</h3><p>Firmware sections and resource descriptions are validated and placed. Shared memory and virtual devices may be prepared.</p></article>
+            <article class="concept-card"><h3>Running</h3><p>The remote processor has acknowledged the ABI and may consume commands. A generation number ties queues to this boot.</p></article>
+            <article class="concept-card"><h3>Crashed</h3><p>Stop submissions, capture a coredump/status snapshot, quiesce DMA and decide whether policy allows automatic recovery.</p></article>
+            <article class="concept-card"><h3>Recovering</h3><p>Invalidate stale handles, reset hardware, reload firmware and rebuild transport state before clients can resume.</p></article>
+            <article class="concept-card"><h3>Suspended</h3><p>Save or discard context explicitly. Firmware availability, IOMMU mappings and queue ownership must be revalidated on resume.</p></article>
+          </div>
+        </section>
+
+        <section class="section" aria-labelledby="handshake">
+          <h2 id="handshake">5. Firmware handshake contract</h2>
+          <pre class="code-block" aria-label="Example firmware capability handshake">host → NPU: HELLO {
+  protocol_major, protocol_minor,
+  host_features, queue_table_iova,
+  address_bits, cache_coherency,
+  boot_generation, nonce
+}
+
+NPU → host: READY {
+  accepted_protocol, firmware_build,
+  npu_features, max_queues,
+  max_tensor_bytes, alignment,
+  watchdog_period, boot_generation
+}</pre>
+          <div class="outcomes">
+            <article class="outcome"><strong>Fail closed on major mismatch</strong><p>A different major version means layouts or semantics may be incompatible. Do not “try anyway.”</p></article>
+            <article class="outcome"><strong>Negotiate optional features</strong><p>Use intersected capability bits and document fallback behavior for minor-version differences.</p></article>
+            <article class="outcome"><strong>Carry boot generation</strong><p>Reject completions from a previous firmware instance after reset or recovery.</p></article>
+            <article class="outcome"><strong>Bound the wait</strong><p>Every reset, firmware load and Ready wait needs a timeout, diagnostic status and safe recovery transition.</p></article>
+          </div>
+        </section>
+
+        <section class="section" aria-labelledby="diagnosis">
+          <h2 id="diagnosis">Startup diagnosis matrix</h2>
+          <div class="table-wrap">
+            <table class="compare-table">
+              <thead><tr><th>Observed gate</th><th>What it proves</th><th>Next checks</th></tr></thead>
+              <tbody>
+                <tr><td>PCI device absent</td><td>No successful enumeration evidence.</td><td>Power, reset, reference clock, lane mapping, link training, firmware resource windows.</td></tr>
+                <tr><td>PCI/DT device present, no driver</td><td>Discovery worked.</td><td>ID/compatible match, kernel configuration, module load, denylist and probe log.</td></tr>
+                <tr><td>Probe starts, then defers</td><td>Driver match worked.</td><td>Missing IOMMU, clocks, regulators, resets, reserved memory or firmware provider.</td></tr>
+                <tr><td>Firmware requested, file missing</td><td>Probe reached firmware load.</td><td>Image name, firmware search path, initramfs packaging and filesystem availability.</td></tr>
+                <tr><td>Firmware copied, no Ready</td><td>Transfer path likely worked.</td><td>Signature/format, entry address, power/clock/reset order, mailbox, IRQ routing and boot-status registers.</td></tr>
+                <tr><td>Ready but runtime rejects</td><td>NPU processor booted.</td><td>ABI/capability mismatch, queue-table address, IOMMU mapping, firmware generation and permissions.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section id="checkpoint" class="section" aria-labelledby="checkpoint-title">
+          <h2 id="checkpoint-title">Host + NPU startup checkpoint</h2>
+          <p class="section-lead">Choose one answer for each question. Explanations appear immediately after checking.</p>
+          <div class="quiz-shell" data-quiz="startup"><noscript>Enable JavaScript to use the interactive quiz.</noscript></div>
+        </section>
+
+        <section class="section" aria-labelledby="sources">
+          <h2 id="sources">Primary references</h2>
+          <div class="source-grid">
+            <a class="source-card" href="https://docs.kernel.org/PCI/pci.html"><strong>Linux kernel · PCI drivers</strong><p>Driver registration, device initialization, resource ownership and shutdown.</p></a>
+            <a class="source-card" href="https://docs.kernel.org/driver-api/firmware/request_firmware.html"><strong>Linux kernel · request_firmware API</strong><p>Synchronous/asynchronous firmware requests and the expected driver workflow.</p></a>
+            <a class="source-card" href="https://docs.kernel.org/driver-api/firmware/lookup-order.html"><strong>Linux kernel · Firmware lookup order</strong><p>Built-in, cache, filesystem, platform and fallback search behavior.</p></a>
+            <a class="source-card" href="https://docs.kernel.org/staging/remoteproc.html"><strong>Linux kernel · remoteproc</strong><p>Power, firmware loading, start/stop and crash lifecycle for remote processors.</p></a>
+            <a class="source-card" href="https://devicetree-specification.readthedocs.io/en/stable/devicetree-basics.html"><strong>Devicetree Specification</strong><p>Firmware description for non-enumerable SoC devices and resources.</p></a>
+          </div>
+        </section>
+
+        <nav class="page-next" aria-label="Learning path navigation">
+          <a href="boot-chain.html">← Boot and trust chain</a>
+          <a href="npu-data-path.html">Next: NPU driver and data path →</a>
+        </nav>
+      </article>
+    </div>
+  </main>
+
+  <footer><p>Branch 3 of 4 · Host discovery, NPU ownership and firmware startup.</p></footer>
+  <script src="quiz.js"></script>
+  <script src="../theme-toggle.js"></script>
+</body>
+</html>

@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="RTOS concepts: deterministic scheduling, interrupts, priority inversion, timers, IPC, memory allocation, watchdogs, and coordination with Linux and NPU processors.">
+  <title>RTOS Concepts and Scheduling</title>
+  <link rel="stylesheet" href="../styles.css">
+  <link rel="stylesheet" href="embedded.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="topbar embedded-topbar">
+    <div>
+      <p class="eyebrow">Embedded systems · branch 1</p>
+      <h1>RTOS Concepts &amp; Scheduling</h1>
+    </div>
+    <nav aria-label="Site navigation">
+      <a href="../index.html">Main Hub</a>
+      <a href="index.html">Learning Tree</a>
+      <a href="#checkpoint">Quiz</a>
+    </nav>
+  </header>
+
+  <main id="main">
+    <nav class="breadcrumb" aria-label="Breadcrumb">
+      <a href="../index.html">Study Hub</a><span aria-hidden="true">/</span>
+      <a href="index.html">Embedded Systems &amp; NPU</a><span aria-hidden="true">/</span>
+      <span aria-current="page">RTOS</span>
+    </nav>
+
+    <div class="topic-layout">
+      <aside class="learning-tree" aria-label="Embedded systems learning tree">
+        <h2>Learning tree</h2>
+        <ul>
+          <li><a href="index.html"><span class="tree-kicker">Root</span>Embedded + NPU map</a></li>
+          <li><a href="rtos.html" aria-current="page"><span class="tree-kicker">Branch 1</span>RTOS &amp; scheduling</a></li>
+          <li><a href="boot-chain.html"><span class="tree-kicker">Branch 2</span>Boot &amp; trust chain</a></li>
+          <li><a href="host-npu-startup.html"><span class="tree-kicker">Branch 3</span>Host + NPU startup</a></li>
+          <li><a href="npu-data-path.html"><span class="tree-kicker">Branch 4</span>Driver &amp; data path</a></li>
+          <li><a href="end-to-end.html"><span class="tree-kicker">Capstone</span>First inference walkthrough</a></li>
+        </ul>
+      </aside>
+
+      <article class="topic-content">
+        <section class="hero-panel">
+          <p class="eyebrow">Bounded response, explicit priorities</p>
+          <h2>An RTOS is about predictability—not maximum throughput</h2>
+          <p>
+            Real-time correctness combines the right result with a timing constraint. The scheduler, interrupt
+            design, critical sections, IPC and memory strategy must make worst-case response time explainable.
+          </p>
+          <div class="tag-row"><span class="topic-tag">Deadlines</span><span class="topic-tag">Preemption</span><span class="topic-tag">ISR → task</span><span class="topic-tag">Watchdogs</span></div>
+        </section>
+
+        <section class="section" aria-labelledby="outcomes">
+          <h2 id="outcomes">Learning outcomes</h2>
+          <div class="outcomes">
+            <article class="outcome"><strong>Classify timing</strong><p>Separate hard, firm and soft deadlines and choose evidence appropriate to each.</p></article>
+            <article class="outcome"><strong>Trace scheduling</strong><p>Explain Ready, Running and Blocked transitions under fixed-priority preemption.</p></article>
+            <article class="outcome"><strong>Bound interference</strong><p>Account for ISRs, critical sections, higher-priority tasks and shared resources.</p></article>
+            <article class="outcome"><strong>Design supervision</strong><p>Use watchdogs and health reports without hiding application deadlocks.</p></article>
+          </div>
+        </section>
+
+        <section class="section" aria-labelledby="core-model">
+          <h2 id="core-model">1. Core timing model</h2>
+          <p class="section-lead">
+            Latency is a distribution; real-time engineering focuses on the upper bound. Average response can be
+            excellent while rare interrupt masking, cache misses or lock contention still violate a deadline.
+          </p>
+          <div class="concept-grid">
+            <article class="concept-card"><h3>Hard deadline</h3><p>Missing it is a system failure: motor control, protection trips or safety interlocks. Prove or conservatively bound worst-case behavior.</p></article>
+            <article class="concept-card"><h3>Firm deadline</h3><p>A late result has no value, but an occasional miss can be handled—for example, dropping a stale sensor frame.</p></article>
+            <article class="concept-card"><h3>Soft deadline</h3><p>Lateness degrades quality rather than correctness: UI refresh, logging or best-effort telemetry.</p></article>
+            <article class="concept-card"><h3>Jitter</h3><p>Variation in release, start or completion time. Control loops may care about jitter even when every job technically meets its deadline.</p></article>
+          </div>
+          <div class="callout">
+            <h3>Response-time budget</h3>
+            <p><code>response = release jitter + blocking + higher-priority interference + execution + preemption/interrupt overhead</code></p>
+          </div>
+        </section>
+
+        <section class="section" aria-labelledby="scheduler">
+          <h2 id="scheduler">2. Scheduler and task states</h2>
+          <p class="section-lead">
+            In a common fixed-priority preemptive RTOS, the highest-priority task that is Ready runs. Equal-priority
+            tasks may time-slice, but time slicing is not a substitute for assigning priorities from deadlines and criticality.
+          </p>
+          <div class="table-wrap">
+            <table class="compare-table">
+              <thead><tr><th>State/event</th><th>Meaning</th><th>Engineering consequence</th></tr></thead>
+              <tbody>
+                <tr><td>Ready</td><td>Eligible to run but waiting for CPU time.</td><td>A higher-priority Ready task normally prevents lower-priority tasks from running.</td></tr>
+                <tr><td>Running</td><td>Currently executing on a CPU core.</td><td>It can be preempted, block on an object, delay, or yield.</td></tr>
+                <tr><td>Blocked</td><td>Waiting for time, a queue, notification, semaphore or event.</td><td>Blocking is efficient; spinning wastes the CPU and raises interference.</td></tr>
+                <tr><td>Suspended</td><td>Explicitly removed from scheduling until resumed.</td><td>Use deliberately; hidden suspend/resume dependencies are difficult to analyze.</td></tr>
+                <tr><td>Release</td><td>A timer or event makes a task Ready.</td><td>If it outranks the running task, a preemptive scheduler switches promptly.</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <ol class="sequence-rail">
+            <li><strong>Sensor IRQ fires</strong><p>The processor saves minimal context and enters the interrupt handler.</p></li>
+            <li><strong>ISR acknowledges and captures</strong><p>Clear the source, copy a small sample or descriptor, and avoid blocking APIs.</p></li>
+            <li><strong>ISR notifies control task</strong><p>An ISR-safe queue, semaphore or direct notification changes the task to Ready.</p></li>
+            <li><strong>Scheduler evaluates priorities</strong><p>If the awakened task outranks the interrupted task, request a context switch on ISR exit.</p></li>
+            <li><strong>Control task runs</strong><p>It performs bounded processing, updates outputs, records timing and blocks until the next release.</p></li>
+          </ol>
+        </section>
+
+        <section class="section" aria-labelledby="interrupts">
+          <h2 id="interrupts">3. Interrupt design</h2>
+          <div class="concept-grid">
+            <article class="concept-card"><h3>Keep the top half bounded</h3><p>Acknowledge the source and move only enough data to prevent loss. Defer parsing, logging, allocation and slow I/O to task context.</p></article>
+            <article class="concept-card"><h3>Use ISR-safe APIs</h3><p>RTOS ports usually provide dedicated FromISR-style primitives. They do not block and can report whether a higher-priority task was awakened.</p></article>
+            <article class="concept-card"><h3>Control interrupt masking</h3><p>Long global-disable or high-priority critical sections directly increase worst-case interrupt latency. Measure maximum masked time.</p></article>
+            <article class="concept-card"><h3>Budget nesting</h3><p>Higher-priority interrupts can preempt lower ones. Include nesting depth, handler time and stack usage in the worst-case design.</p></article>
+          </div>
+          <div class="callout warning">
+            <h3>Priority numbers are architecture-specific</h3>
+            <p>
+              Some interrupt controllers use a lower numeric value for a higher hardware priority, while many RTOS
+              task APIs use larger numbers for higher task priority. Never infer urgency from the number alone.
+            </p>
+          </div>
+        </section>
+
+        <section class="section" aria-labelledby="inversion">
+          <h2 id="inversion">4. Priority inversion and bounded sharing</h2>
+          <p class="section-lead">The classic failure requires three priorities and one shared lock.</p>
+          <ol class="sequence-rail">
+            <li><strong>Low takes a mutex</strong><p>A low-priority task begins a short critical section protecting a shared device.</p></li>
+            <li><strong>High blocks on the mutex</strong><p>The most urgent task cannot proceed even though Low owns the needed resource.</p></li>
+            <li><strong>Medium preempts Low</strong><p>Unrelated medium-priority work can run indefinitely, indirectly blocking High.</p></li>
+            <li><strong>Priority inheritance raises Low</strong><p>Low temporarily executes at High's priority, completes the critical section and releases the mutex.</p></li>
+            <li><strong>High runs; Low returns to base priority</strong><p>The inversion becomes bounded by the protected critical section rather than Medium's workload.</p></li>
+          </ol>
+          <div class="callout danger">
+            <h3>Inheritance is damage control, not permission for large critical sections</h3>
+            <p>Keep lock scope small, avoid blocking while holding a lock, define a global lock order, and prefer single-owner task designs for complex peripherals.</p>
+          </div>
+        </section>
+
+        <section class="section" aria-labelledby="services">
+          <h2 id="services">5. Timers, IPC, memory and watchdogs</h2>
+          <div class="concept-grid">
+            <article class="concept-card"><h3>Timers</h3><p>Hardware timers drive precise release events; software timers often run callbacks in a shared timer task. A slow callback delays every timer behind it.</p></article>
+            <article class="concept-card"><h3>IPC</h3><p>Queues transfer ownership and apply backpressure. Notifications are lightweight one-to-one signals. Semaphores signal availability; mutexes protect ownership.</p></article>
+            <article class="concept-card"><h3>Memory allocation</h3><p>Static stacks, fixed-block pools and bounded queues remove fragmentation and unbounded allocator paths. Size stacks from measured high-water marks plus margin.</p></article>
+            <article class="concept-card"><h3>Watchdogs</h3><p>A supervisor feeds the hardware watchdog only after critical tasks report progress. Record reset cause and preserve a minimal crash breadcrumb.</p></article>
+            <article class="concept-card"><h3>Backpressure</h3><p>Every queue needs a full policy: block with a bound, drop newest, drop oldest, overwrite a sample, or enter a safe state. “The queue never fills” is not a policy.</p></article>
+            <article class="concept-card"><h3>Tickless idle</h3><p>Suppress periodic ticks while idle to save power, then program the next wake event. Account for timer drift and wake-up latency.</p></article>
+          </div>
+        </section>
+
+        <section class="section" aria-labelledby="coordination">
+          <h2 id="coordination">6. Linux host, RTOS control core and NPU coordination</h2>
+          <p class="section-lead">
+            A heterogeneous system often combines Linux for rich policy and applications, an RTOS for bounded control,
+            and NPU firmware for accelerator-local scheduling. Define ownership before defining messages.
+          </p>
+          <div class="architecture-panel">
+            <section class="arch-zone"><h3>Linux host</h3><ul><li>Security and process isolation</li><li>Model/runtime lifecycle</li><li>Large memory and filesystems</li><li>Updates and diagnostics</li></ul></section>
+            <section class="arch-zone interconnect"><h3>Contract</h3><p>mailbox · shared memory · rpmsg · queue ABI · heartbeat</p></section>
+            <section class="arch-zone"><h3>RTOS / NPU side</h3><ul><li>Bounded control loops</li><li>Power and safety state</li><li>Command execution</li><li>Local watchdog and fault report</li></ul></section>
+          </div>
+          <div class="outcomes">
+            <article class="outcome"><strong>Version the ABI</strong><p>Handshake before commands: protocol version, features, queue shape, address width and cache-coherency model.</p></article>
+            <article class="outcome"><strong>Specify reset ownership</strong><p>Who may reset the remote side, how DMA is quiesced, and what happens to in-flight work?</p></article>
+            <article class="outcome"><strong>Use monotonic heartbeats</strong><p>Distinguish transport silence, a stalled task and an intentionally powered-down subsystem.</p></article>
+            <article class="outcome"><strong>Design degraded modes</strong><p>Define which safety or control functions survive when Linux, the NPU, or the interconnect is unavailable.</p></article>
+          </div>
+        </section>
+
+        <section class="section" aria-labelledby="failure-modes">
+          <h2 id="failure-modes">Failure patterns to recognize</h2>
+          <div class="failure-grid">
+            <article class="failure-card"><h3>Missed deadline</h3><p>Trace release timestamp, ISR delay, Ready-to-Running delay, lock blocking, execution time and completion separately.</p></article>
+            <article class="failure-card"><h3>Stack overflow</h3><p>Watch nested interrupts, recursion, large local arrays and library call depth. Enable guards and high-water instrumentation.</p></article>
+            <article class="failure-card"><h3>Queue saturation</h3><p>Measure producer/consumer rates, maximum depth and drop counts. Decide whether stale work should be discarded or coalesced.</p></article>
+            <article class="failure-card"><h3>Watchdog reset loop</h3><p>Persist reset reason and a boot counter; enter recovery after repeated failures rather than endlessly restarting the same image.</p></article>
+          </div>
+        </section>
+
+        <section id="checkpoint" class="section" aria-labelledby="checkpoint-title">
+          <h2 id="checkpoint-title">RTOS checkpoint</h2>
+          <p class="section-lead">Choose one answer for each question. Explanations appear immediately after checking.</p>
+          <div class="quiz-shell" data-quiz="rtos"><noscript>Enable JavaScript to use the interactive quiz.</noscript></div>
+        </section>
+
+        <section class="section" aria-labelledby="sources">
+          <h2 id="sources">Primary references</h2>
+          <div class="source-grid">
+            <a class="source-card" href="https://www.freertos.org/Documentation/01-FreeRTOS-quick-start/01-Beginners-guide/01-RTOS-fundamentals"><strong>FreeRTOS · RTOS fundamentals</strong><p>Real-time scheduling, task priorities and timing objectives.</p></a>
+            <a class="source-card" href="https://www.freertos.org/Documentation/02-Kernel/02-Kernel-features/01-Tasks-and-co-routines/03-Task-priorities"><strong>FreeRTOS · Task priorities</strong><p>Highest-priority Ready task selection and equal-priority time slicing.</p></a>
+            <a class="source-card" href="https://freertos.org/Real-time-embedded-RTOS-mutexes.html"><strong>FreeRTOS · Mutexes</strong><p>Mutual exclusion and simplified priority inheritance behavior.</p></a>
+            <a class="source-card" href="https://docs.kernel.org/core-api/real-time/theory.html"><strong>Linux kernel · PREEMPT_RT theory</strong><p>Priority inheritance, threaded interrupts and sources of latency in real-time Linux.</p></a>
+          </div>
+        </section>
+
+        <nav class="page-next" aria-label="Learning path navigation">
+          <a href="index.html">← Learning tree</a>
+          <a href="boot-chain.html">Next: boot and trust chain →</a>
+        </nav>
+      </article>
+    </div>
+  </main>
+
+  <footer><p>Branch 1 of 4 · RTOS concepts and scheduling.</p></footer>
+  <script src="quiz.js"></script>
+  <script src="../theme-toggle.js"></script>
+</body>
+</html>

@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Boot ROM, secure and measured boot, staged bootloaders, UEFI, U-Boot, device tree, Linux kernel initialization, initramfs and PID 1.">
+  <title>Boot ROM to Kernel Initialization</title>
+  <link rel="stylesheet" href="../styles.css">
+  <link rel="stylesheet" href="embedded.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="topbar embedded-topbar">
+    <div>
+      <p class="eyebrow">Embedded systems · branch 2</p>
+      <h1>Boot ROM, Trust Chain &amp; Kernel Initialization</h1>
+    </div>
+    <nav aria-label="Site navigation">
+      <a href="../index.html">Main Hub</a>
+      <a href="index.html">Learning Tree</a>
+      <a href="#checkpoint">Quiz</a>
+    </nav>
+  </header>
+
+  <main id="main">
+    <nav class="breadcrumb" aria-label="Breadcrumb">
+      <a href="../index.html">Study Hub</a><span aria-hidden="true">/</span>
+      <a href="index.html">Embedded Systems &amp; NPU</a><span aria-hidden="true">/</span>
+      <span aria-current="page">Boot and trust chain</span>
+    </nav>
+
+    <div class="topic-layout">
+      <aside class="learning-tree" aria-label="Embedded systems learning tree">
+        <h2>Learning tree</h2>
+        <ul>
+          <li><a href="index.html"><span class="tree-kicker">Root</span>Embedded + NPU map</a></li>
+          <li><a href="rtos.html"><span class="tree-kicker">Branch 1</span>RTOS &amp; scheduling</a></li>
+          <li><a href="boot-chain.html" aria-current="page"><span class="tree-kicker">Branch 2</span>Boot &amp; trust chain</a></li>
+          <li><a href="host-npu-startup.html"><span class="tree-kicker">Branch 3</span>Host + NPU startup</a></li>
+          <li><a href="npu-data-path.html"><span class="tree-kicker">Branch 4</span>Driver &amp; data path</a></li>
+          <li><a href="end-to-end.html"><span class="tree-kicker">Capstone</span>First inference walkthrough</a></li>
+        </ul>
+      </aside>
+
+      <article class="topic-content">
+        <section class="hero-panel">
+          <p class="eyebrow">Reset vector to PID 1</p>
+          <h2>Boot is a sequence of progressively richer execution environments</h2>
+          <p>
+            Each stage runs with more memory and device support than the stage before it. Secure designs also make
+            each handoff a trust decision: authenticate the next image, validate its policy, then transfer control.
+          </p>
+          <div class="tag-row"><span class="topic-tag">Boot ROM</span><span class="topic-tag">Secure Boot</span><span class="topic-tag">UEFI / U-Boot</span><span class="topic-tag">Device tree</span><span class="topic-tag">Linux init</span></div>
+        </section>
+
+        <section class="section" aria-labelledby="outcomes">
+          <h2 id="outcomes">Learning outcomes</h2>
+          <div class="outcomes">
+            <article class="outcome"><strong>Trace execution</strong><p>Name the code currently running, available memory, boot source and next handoff at every stage.</p></article>
+            <article class="outcome"><strong>Trace trust</strong><p>Identify the root key, signed object, revocation policy and rollback boundary for each mutable image.</p></article>
+            <article class="outcome"><strong>Compare firmware</strong><p>Separate standardized UEFI services from U-Boot's embedded boot flows and understand where they overlap.</p></article>
+            <article class="outcome"><strong>Debug Linux entry</strong><p>Distinguish a loader failure, bad hardware description, driver probe delay, rootfs failure and PID 1 failure.</p></article>
+          </div>
+        </section>
+
+        <section class="section" aria-labelledby="boot-stages">
+          <h2 id="boot-stages">1. Staged boot sequence</h2>
+          <ol class="sequence-rail">
+            <li><strong>Reset and immutable Boot ROM</strong><p>CPU state is minimal. ROM samples boot straps or fuses, initializes only what is necessary to read a boot device, and selects a recovery or normal path.</p></li>
+            <li><strong>Authenticate the first mutable stage</strong><p>ROM hashes and verifies a signed header or manifest against a key anchored in ROM or one-time-programmable storage. Anti-rollback policy may reject an old but correctly signed image.</p></li>
+            <li><strong>Small first-stage loader</strong><p>Code-size and SRAM constraints dominate. It initializes clocks and DRAM, then loads a richer firmware stage. U-Boot systems may call these TPL or SPL; names vary.</p></li>
+            <li><strong>Platform firmware / bootloader</strong><p>Discover boot media, initialize consoles and buses, apply update/recovery policy, select an OS image and assemble kernel parameters.</p></li>
+            <li><strong>Load the OS payload</strong><p>Place the kernel, optional initramfs and hardware description at valid memory addresses; verify required signatures; prepare the architecture-specific entry contract.</p></li>
+            <li><strong>Transfer control to the kernel</strong><p>Pass the device tree or ACPI/UEFI information, command line and memory map. Firmware boot services end when the OS takes ownership.</p></li>
+            <li><strong>Kernel initialization</strong><p>Set up architecture state, memory management, scheduler, interrupts, timers, buses and initcalls; probe built-in drivers and prepare the root filesystem.</p></li>
+            <li><strong>Start userspace</strong><p>Execute PID 1 from initramfs or the real root filesystem. PID 1 starts services, including the NPU runtime daemon if the design uses one.</p></li>
+          </ol>
+        </section>
+
+        <section class="section" aria-labelledby="trust-chain">
+          <h2 id="trust-chain">2. Secure, verified and measured boot</h2>
+          <div class="concept-grid">
+            <article class="concept-card"><h3>Root of trust</h3><p>An immutable key, key hash or verification routine anchors the chain. If the anchor can be replaced without authorization, downstream signatures have no value.</p></article>
+            <article class="concept-card"><h3>Verified boot</h3><p>Execution is allowed only after signature and policy checks. The chain can cover firmware, kernel, device tree, initramfs and a verified root filesystem.</p></article>
+            <article class="concept-card"><h3>Measured boot</h3><p>Stages record hashes into protected measurement registers for later attestation. Measurement reports what ran; it does not automatically prevent execution.</p></article>
+            <article class="concept-card"><h3>Anti-rollback</h3><p>Signed old firmware can still contain known vulnerabilities. Monotonic counters or secure version policy reject images below the accepted security version.</p></article>
+            <article class="concept-card"><h3>Revocation</h3><p>Compromised signers must be removable through authenticated revocation lists or key rotation without destroying the recovery path.</p></article>
+            <article class="concept-card"><h3>A/B updates</h3><p>Write the inactive slot, authenticate it, try it with a bounded boot counter, then mark success from a healthy system. Fall back after repeated failures.</p></article>
+          </div>
+          <div class="callout danger">
+            <h3>Authentication is not confidentiality</h3>
+            <p>Secure Boot verifies origin and integrity. Encrypting firmware, protecting secret keys and preventing physical extraction require additional controls.</p>
+          </div>
+        </section>
+
+        <section class="section" aria-labelledby="uefi-uboot">
+          <h2 id="uefi-uboot">3. UEFI and U-Boot</h2>
+          <div class="table-wrap">
+            <table class="compare-table">
+              <thead><tr><th>Dimension</th><th>UEFI</th><th>U-Boot</th></tr></thead>
+              <tbody>
+                <tr><td>What it is</td><td>A firmware interface specification plus boot-manager behavior and standard protocols.</td><td>An open-source bootloader widely used in embedded systems, with board ports, commands and boot methods.</td></tr>
+                <tr><td>Boot selection</td><td>Boot#### options and BootOrder variables identify EFI applications and device paths.</td><td>Standard boot scans boot devices and boot methods for a usable bootflow; scripts and direct boot commands also exist.</td></tr>
+                <tr><td>OS handoff</td><td>Launches an EFI OS loader or EFI-stub kernel; the OS calls ExitBootServices before taking full ownership.</td><td>Can load a kernel, initrd and DTB directly with bootm/booti/bootz, or expose UEFI services and run an EFI application.</td></tr>
+                <tr><td>Hardware description</td><td>Commonly ACPI on PCs/servers; AArch64 embedded platforms may also pass a device tree.</td><td>Strong device-tree integration for both U-Boot's own driver model and the Linux payload.</td></tr>
+                <tr><td>Secure boot</td><td>Defines image validation and key databases such as PK, KEK, db and dbx.</td><td>Supports signed FIT configurations, verified-boot chains and platform-specific key storage.</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="callout">
+            <h3>They can coexist</h3>
+            <p>U-Boot can implement UEFI protocols and launch GRUB or an EFI-stub Linux kernel. “UEFI versus U-Boot” is not always an exclusive platform choice.</p>
+          </div>
+        </section>
+
+        <section class="section" aria-labelledby="device-tree">
+          <h2 id="device-tree">4. Device tree: describing non-discoverable hardware</h2>
+          <p class="section-lead">
+            A DTB is a compact tree of nodes and properties. It does not contain drivers; it describes hardware so
+            the kernel can instantiate devices, match drivers and supply resources.
+          </p>
+          <pre class="code-block" aria-label="Example NPU device tree node">npu@4a000000 {
+    compatible = "vendor,npu-v2", "vendor,npu";
+    reg = &lt;0x0 0x4a000000 0x0 0x10000&gt;;
+    interrupts = &lt;0 92 4&gt;;
+    clocks = &lt;&amp;accel_clk&gt;;
+    resets = &lt;&amp;resetc 7&gt;;
+    iommus = &lt;&amp;smmu 0x34&gt;;
+    memory-region = &lt;&amp;npu_fw&gt;, &lt;&amp;npu_shmem&gt;;
+    firmware-name = "vendor/npu-fw.bin";
+    status = "okay";
+};</pre>
+          <div class="concept-grid">
+            <article class="concept-card"><h3><code>compatible</code></h3><p>Ordered strings describe the programming model from most specific to fallback. Drivers match an OF table against these values.</p></article>
+            <article class="concept-card"><h3><code>reg</code></h3><p>Address and size tuples identify MMIO or bus resources. Cell counts come from the parent bus.</p></article>
+            <article class="concept-card"><h3><code>interrupts</code></h3><p>Interrupt specifiers are interpreted by the referenced interrupt domain. The raw numbers are not portable without the binding.</p></article>
+            <article class="concept-card"><h3>clocks and resets</h3><p>Provider references let the driver request correct sequencing through kernel frameworks instead of hard-coding registers.</p></article>
+            <article class="concept-card"><h3><code>iommus</code></h3><p>Associates the device with an IOMMU and stream identifier used to isolate DMA transactions.</p></article>
+            <article class="concept-card"><h3><code>reserved-memory</code></h3><p>Excludes firmware/shared regions from normal allocation; consumers reference the regions with <code>memory-region</code>.</p></article>
+          </div>
+          <div class="callout warning">
+            <h3>This node is illustrative, not a binding</h3>
+            <p>Real property names, cell encodings and required resources come from the device's reviewed binding and SoC integration documentation.</p>
+          </div>
+        </section>
+
+        <section class="section" aria-labelledby="kernel-init">
+          <h2 id="kernel-init">5. Linux kernel initialization</h2>
+          <ol class="step-flow">
+            <li><strong>Early architecture</strong><span>Establish CPU mode, early console, boot parameters and physical memory view.</span></li>
+            <li><strong>Memory</strong><span>Build page tables, allocators and reserved regions; preserve firmware/DTB/initramfs memory.</span></li>
+            <li><strong>Core kernel</strong><span>Initialize scheduler, timekeeping, interrupts, workqueues and synchronization infrastructure.</span></li>
+            <li><strong>Subsystem init</strong><span>Run ordered initcalls for buses, filesystems, security and built-in drivers.</span></li>
+            <li><strong>Device probe</strong><span>Match devices to drivers; defer probes whose clocks, regulators, IOMMUs or firmware are not ready.</span></li>
+            <li><strong>Root filesystem</strong><span>Use initramfs to discover storage/unlock volumes if needed, then mount or switch to the real root.</span></li>
+            <li><strong>PID 1</strong><span>Execute the first userspace program; a missing or invalid init causes a kernel panic.</span></li>
+          </ol>
+        </section>
+
+        <section class="section" aria-labelledby="debug-gates">
+          <h2 id="debug-gates">Boot failure gates</h2>
+          <div class="failure-grid">
+            <article class="failure-card"><h3>No ROM output</h3><p>Confirm reset, power rails, strap/fuse boot selection and whether ROM exposes any observable UART, USB or status code.</p></article>
+            <article class="failure-card"><h3>Signature rejection</h3><p>Check image format, signed bytes, key hierarchy, revocation database, security version and board lifecycle state.</p></article>
+            <article class="failure-card"><h3>Bootloader runs, kernel silent</h3><p>Validate load/entry address, architecture mode, DTB pointer, console command line, memory overlap and kernel image type.</p></article>
+            <article class="failure-card"><h3>Kernel cannot find device</h3><p>Inspect firmware description, status property, compatible match, resource providers, deferred probe messages and driver configuration.</p></article>
+            <article class="failure-card"><h3>Cannot mount root</h3><p>Check root= arguments, storage driver availability, initramfs contents, filesystem support and encryption/RAID dependencies.</p></article>
+            <article class="failure-card"><h3>PID 1 failure</h3><p>Verify executable path, permissions, interpreter, shared libraries, architecture and the initramfs-to-root switch.</p></article>
+          </div>
+        </section>
+
+        <section id="checkpoint" class="section" aria-labelledby="checkpoint-title">
+          <h2 id="checkpoint-title">Boot-chain checkpoint</h2>
+          <p class="section-lead">Choose one answer for each question. Explanations appear immediately after checking.</p>
+          <div class="quiz-shell" data-quiz="boot"><noscript>Enable JavaScript to use the interactive quiz.</noscript></div>
+        </section>
+
+        <section class="section" aria-labelledby="sources">
+          <h2 id="sources">Primary references</h2>
+          <div class="source-grid">
+            <a class="source-card" href="https://uefi.org/specs/UEFI/2.11/03_Boot_Manager.html"><strong>UEFI 2.11 · Boot Manager</strong><p>Boot options, boot order, drivers, applications and Secure Boot state.</p></a>
+            <a class="source-card" href="https://docs.u-boot.org/en/latest/develop/bootstd/index.html"><strong>U-Boot · Standard Boot</strong><p>Boot devices, methods and flows for discovering an OS payload.</p></a>
+            <a class="source-card" href="https://docs.u-boot.org/en/latest/usage/fit/verified-boot.html"><strong>U-Boot · Verified Boot</strong><p>Signature chains, trusted key placement and signed FIT images.</p></a>
+            <a class="source-card" href="https://docs.u-boot.org/en/latest/develop/devicetree/control.html"><strong>U-Boot · Devicetree Control</strong><p>How U-Boot consumes and passes flattened device trees.</p></a>
+            <a class="source-card" href="https://devicetree-specification.readthedocs.io/en/stable/devicetree-basics.html"><strong>Devicetree Specification</strong><p>Nodes, compatible strings, address cells and interrupt relationships.</p></a>
+            <a class="source-card" href="https://docs.kernel.org/devicetree/usage-model.html"><strong>Linux and the Devicetree</strong><p>Linux matching, platform population and the FDT usage model.</p></a>
+          </div>
+        </section>
+
+        <nav class="page-next" aria-label="Learning path navigation">
+          <a href="rtos.html">← RTOS concepts</a>
+          <a href="host-npu-startup.html">Next: host + NPU startup →</a>
+        </nav>
+      </article>
+    </div>
+  </main>
+
+  <footer><p>Branch 2 of 4 · Boot ROM, bootloaders, trust and Linux initialization.</p></footer>
+  <script src="quiz.js"></script>
+  <script src="../theme-toggle.js"></script>
+</body>
+</html>

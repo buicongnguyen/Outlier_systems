@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Study hub for systems assessment preparation: databases and storage, OS/concurrency/runtime, distributed systems, networking, and infrastructure.">
+  <meta name="description" content="Study hub for systems assessment preparation: databases, OS/concurrency, distributed systems, networking, infrastructure, RTOS, secure boot, and host + NPU systems.">
   <title>Systems Study Hub</title>
   <link rel="stylesheet" href="styles.css">
 </head>
@@ -17,6 +17,7 @@
       <a href="#summary">Summary</a>
       <a href="#documents">Documents</a>
       <a href="systems-skills.html">Systems Skills</a>
+      <a href="embedded-systems/index.html">Embedded + NPU</a>
       <a href="coding-questions.html">Coding Q&amp;A</a>
     </nav>
   </header>
@@ -61,6 +62,11 @@
           <p>Containers vs VMs, Kubernetes reconciliation, deployment strategies, IaC, observability and SLOs, caching layers, and message queues.</p>
         </article>
         <article class="mini-card">
+          <span class="status good">Embedded</span>
+          <h3>RTOS, Boot &amp; Host + NPU</h3>
+          <p>Deterministic scheduling, Boot ROM and secure loaders, UEFI/U-Boot, device tree, NPU firmware, PCIe/SoC discovery, DMA/IOMMU, queues, interrupts, and first inference.</p>
+        </article>
+        <article class="mini-card">
           <span class="status warning">Practice format</span>
           <h3>Question Drills</h3>
           <p>100 questions with explanations across five sections — single-answer, multi-select, ordering chains, and complete-the-code snippets (SQL joins, shell redirection, pthread waits, DNS records, Kubernetes probes, Dockerfile caching), including 15 senior/principal-tagged production-diagnosis scenarios — with per-section and overall scores, a show-all-explanations toggle, and a reshuffling retry button. Works offline.</p>
@@ -83,12 +89,16 @@
           <strong>Systems Skills Revision and Question Practice</strong>
           <span>Definitions, core-concept cards, SVG sequence diagrams of Raft elections, TCP/TLS handshakes, DNS resolution, replication lag, 2PC vs sagas, and the lost-update race, sketches of B-trees, WAL commits, and virtual memory, an animated step-through walkthrough of the stack and heap during a function call, further-reading links, and 100 practice questions in four formats (single answer, multi-select, ordering, complete-the-code) — 15 of them senior/principal-level scenarios — across databases, OS/concurrency, distributed systems, networking, and infrastructure.</span>
         </a>
+        <a class="doc-link featured" href="embedded-systems/index.html">
+          <strong>Embedded Systems &amp; NPU Learning Tree</strong>
+          <span>Five connected pages from RTOS scheduling and secure boot through host/NPU startup, protected DMA queues, interrupts, firmware recovery, and a complete cold-boot-to-first-inference case study — with five explained MCQs on every topic.</span>
+        </a>
       </div>
     </section>
   </main>
 
   <footer>
-    <p>Last updated: 2026-07-04. Styles shared with the Isaac Sim study hub.</p>
+    <p>Last updated: 2026-07-20. Styles shared with the Isaac Sim study hub.</p>
   </footer>
   <script src="./theme-toggle.js"></script>
 </body>

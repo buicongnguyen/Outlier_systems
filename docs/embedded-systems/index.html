@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="A structured learning path for RTOS design, secure boot, host and NPU startup, accelerator drivers, DMA, IOMMU, queues, interrupts, and first inference.">
+  <title>Embedded Systems and NPU Learning Tree</title>
+  <link rel="stylesheet" href="../styles.css">
+  <link rel="stylesheet" href="embedded.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="topbar embedded-topbar">
+    <div>
+      <p class="eyebrow">Systems study hub · embedded branch</p>
+      <h1>Embedded Systems &amp; NPU Learning Tree</h1>
+    </div>
+    <nav aria-label="Site navigation">
+      <a href="../index.html">Main Hub</a>
+      <a href="../systems-skills.html">Systems Skills</a>
+      <a href="end-to-end.html">Host + NPU Case Study</a>
+    </nav>
+  </header>
+
+  <main id="main">
+    <nav class="breadcrumb" aria-label="Breadcrumb">
+      <a href="../index.html">Study Hub</a>
+      <span aria-hidden="true">/</span>
+      <span aria-current="page">Embedded Systems &amp; NPU</span>
+    </nav>
+
+    <div class="topic-layout">
+      <aside class="learning-tree" aria-label="Embedded systems learning tree">
+        <h2>Learning tree</h2>
+        <ul>
+          <li><a href="index.html" aria-current="page"><span class="tree-kicker">Root</span>Embedded + NPU map</a></li>
+          <li><a href="rtos.html"><span class="tree-kicker">Branch 1</span>RTOS &amp; scheduling</a></li>
+          <li><a href="boot-chain.html"><span class="tree-kicker">Branch 2</span>Boot &amp; trust chain</a></li>
+          <li><a href="host-npu-startup.html"><span class="tree-kicker">Branch 3</span>Host + NPU startup</a></li>
+          <li><a href="npu-data-path.html"><span class="tree-kicker">Branch 4</span>Driver &amp; data path</a></li>
+          <li><a href="end-to-end.html"><span class="tree-kicker">Capstone</span>First inference walkthrough</a></li>
+        </ul>
+      </aside>
+
+      <div class="topic-content">
+        <section class="hero-panel">
+          <p class="eyebrow">From reset vector to useful inference</p>
+          <h2>Understand every ownership handoff in a host + NPU system</h2>
+          <p>
+            Follow the path from immutable Boot ROM through trusted firmware, Linux and the accelerator driver,
+            then into NPU firmware, protected DMA queues, the userspace runtime, model loading and inference.
+            Each branch ends with a five-question checkpoint and detailed explanations.
+          </p>
+          <div class="tag-row" aria-label="Topics">
+            <span class="topic-tag">RTOS</span>
+            <span class="topic-tag">Secure boot</span>
+            <span class="topic-tag">Linux drivers</span>
+            <span class="topic-tag">NPU firmware</span>
+            <span class="topic-tag">DMA + IOMMU</span>
+            <span class="topic-tag">Command queues</span>
+          </div>
+        </section>
+
+        <section class="section" aria-labelledby="system-map">
+          <h2 id="system-map">System map</h2>
+          <p class="section-lead">
+            The host owns policy, memory protection and application lifecycle. The NPU firmware owns the
+            accelerator's local scheduling and hardware programming. A driver-defined control and data path is
+            the contract between them.
+          </p>
+          <div class="architecture-panel">
+            <section class="arch-zone">
+              <h3>Host CPU</h3>
+              <ul>
+                <li>Boot firmware and Linux</li>
+                <li>NPU kernel driver</li>
+                <li>Runtime and compiler</li>
+                <li>Model and buffer ownership</li>
+                <li>Recovery policy</li>
+              </ul>
+            </section>
+            <section class="arch-zone interconnect">
+              <h3>Control + data</h3>
+              <p>MMIO · mailbox · PCIe/NoC · DMA · interrupts</p>
+            </section>
+            <section class="arch-zone">
+              <h3>NPU subsystem</h3>
+              <ul>
+                <li>Boot/reset controller</li>
+                <li>Firmware or RTOS</li>
+                <li>Command processor</li>
+                <li>Tensor engines and local SRAM</li>
+                <li>Completion and fault reporting</li>
+              </ul>
+            </section>
+          </div>
+        </section>
+
+        <section class="section" aria-labelledby="branches">
+          <h2 id="branches">Five connected branches</h2>
+          <div class="concept-grid">
+            <a class="source-card" href="rtos.html">
+              <strong>1 · RTOS concepts and scheduling</strong>
+              <p>Deadlines, fixed priorities, interrupts, inversion, timers, IPC, memory, watchdogs and coordination with Linux.</p>
+            </a>
+            <a class="source-card" href="boot-chain.html">
+              <strong>2 · Boot ROM to kernel initialization</strong>
+              <p>Roots of trust, staged loaders, UEFI/U-Boot, device tree, initramfs, PID 1 and failure boundaries.</p>
+            </a>
+            <a class="source-card" href="host-npu-startup.html">
+              <strong>3 · Host CPU and NPU startup</strong>
+              <p>PCIe versus SoC discovery, driver binding, reset/clock sequencing, firmware loading and ABI handshake.</p>
+            </a>
+            <a class="source-card" href="npu-data-path.html">
+              <strong>4 · Driver, DMA and interrupt data path</strong>
+              <p>BARs, MMIO, IOMMU mappings, command/completion rings, doorbells, barriers and recovery.</p>
+            </a>
+            <a class="source-card" href="end-to-end.html">
+              <strong>5 · Capstone system walkthrough</strong>
+              <p>A concrete cold-boot-to-first-inference sequence with invariants, evidence and troubleshooting gates.</p>
+            </a>
+          </div>
+        </section>
+
+        <section class="section" aria-labelledby="golden-path">
+          <h2 id="golden-path">Golden path: cold boot to first inference</h2>
+          <p class="section-lead">Treat each arrow as a contract. If a stage fails, debug the earliest invariant that is not yet true.</p>
+          <ol class="step-flow">
+            <li><strong>Boot ROM</strong><span>Select boot source and authenticate the first mutable stage.</span></li>
+            <li><strong>Secure boot</strong><span>Extend trust through firmware, configuration and recovery policy.</span></li>
+            <li><strong>Bootloader</strong><span>Initialize required hardware and select the OS boot flow.</span></li>
+            <li><strong>Host kernel</strong><span>Initialize memory, interrupts, buses, drivers and userspace.</span></li>
+            <li><strong>Device discovery</strong><span>Enumerate PCIe or instantiate a firmware-described platform device.</span></li>
+            <li><strong>NPU driver</strong><span>Claim resources, map registers, enable power and establish isolation.</span></li>
+            <li><strong>NPU firmware</strong><span>Authenticate, transfer, start and negotiate the control ABI.</span></li>
+            <li><strong>DMA + IOMMU</strong><span>Create constrained device-visible mappings for shared buffers.</span></li>
+            <li><strong>Runtime</strong><span>Expose contexts, queues, synchronization and compiler services.</span></li>
+            <li><strong>Model loading</strong><span>Compile or deserialize graphs, allocate tensors and upload constants.</span></li>
+            <li><strong>Inference</strong><span>Submit commands, execute, signal completion and return outputs.</span></li>
+          </ol>
+        </section>
+
+        <section class="section" aria-labelledby="variants">
+          <h2 id="variants">Two hardware variants to keep separate</h2>
+          <div class="variant-grid">
+            <article class="variant-card">
+              <h3>SoC-integrated NPU</h3>
+              <p>
+                Firmware tables usually describe register ranges, clocks, resets, interrupts, IOMMU links and
+                reserved memory. A Linux platform driver may use remoteproc-style lifecycle control or a vendor
+                subsystem to load firmware into tightly coupled memory.
+              </p>
+            </article>
+            <article class="variant-card">
+              <h3>Discrete PCIe NPU</h3>
+              <p>
+                The PCIe link trains, configuration space is enumerated, BARs and interrupt vectors are assigned,
+                and a PCI driver binds by vendor/device ID. The device may boot internal ROM before accepting host-
+                supplied firmware through BAR, DMA or a management interface.
+              </p>
+            </article>
+          </div>
+          <div class="callout warning">
+            <h3>Do not memorize one vendor's exact boot order as universal</h3>
+            <p>
+              The invariant chain is portable, but ownership differs. Some NPUs authenticate firmware internally;
+              others rely on trusted host software. Some share coherent system memory; others require explicit copies.
+            </p>
+          </div>
+        </section>
+
+        <section class="section" aria-labelledby="study-method">
+          <h2 id="study-method">How to use this branch</h2>
+          <div class="outcomes">
+            <article class="outcome"><strong>1 · Read for invariants</strong><p>At each stage, identify who runs, what it trusts, what resources it owns and what evidence proves success.</p></article>
+            <article class="outcome"><strong>2 · Draw the handoff</strong><p>Reproduce the sequence without notes, including error and recovery signals rather than only the happy path.</p></article>
+            <article class="outcome"><strong>3 · Take the checkpoint</strong><p>Answer all five MCQs on each topic page and read every explanation, including the ones you answered correctly.</p></article>
+            <article class="outcome"><strong>4 · Diagnose backwards</strong><p>Start from the failed observable, then walk backward to the earliest missing invariant instead of guessing components.</p></article>
+          </div>
+        </section>
+
+        <nav class="page-next" aria-label="Learning path navigation">
+          <a href="../index.html">← Main study hub</a>
+          <a href="rtos.html">Start with RTOS concepts →</a>
+        </nav>
+      </div>
+    </div>
+  </main>
+
+  <footer>
+    <p>Embedded Systems &amp; NPU branch · structured for offline study and interview review.</p>
+  </footer>
+  <script src="../theme-toggle.js"></script>
+</body>
+</html>
