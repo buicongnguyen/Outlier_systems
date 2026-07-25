@@ -141,22 +141,31 @@
         <section class="section" aria-labelledby="queues">
           <h2 id="queues">5. Command and completion queues</h2>
           <p class="section-lead">A ring buffer is simple only after ownership and memory ordering are explicit.</p>
-          <pre class="code-block" aria-label="Example NPU submission sequence">host:
+          <pre class="code-block" aria-label="Example NPU submission and completion sequence">host submission (serialized or after reserving a slot):
+  next = producer + 1
   slot = submit_ring[producer % ring_size]
   fill_descriptor(slot, opcode, buffers, fence, generation)
-  dma_write_barrier()           // descriptor visible before producer
-  shared_producer = producer + 1
-  mmio_write(DOORBELL, queue_id)
+  dma_wmb()                     // descriptor visible before producer
+  WRITE_ONCE(shared_producer, next)
+  writel(queue_id, DOORBELL)    // ordered MMIO notification
+  producer = next
 
 NPU firmware:
   observe producer
+  dma_read_barrier()            // producer observed before descriptor reads
   read descriptor
   validate generation + bounds
   execute command
   write completion status
   dma_write_barrier()           // status visible before completion producer
   update completion_producer
-  raise interrupt or event</pre>
+  raise interrupt or event
+
+host completion:
+  completed = READ_ONCE(completion_producer)
+  dma_rmb()                     // producer observed before status reads
+  drain completion records up to completed
+  publish completion_consumer</pre>
           <div class="outcomes">
             <article class="outcome"><strong>Producer owns free slots</strong><p>It must never overrun the consumer. Track wrap with monotonic counters or an explicit phase bit.</p></article>
             <article class="outcome"><strong>Consumer owns published slots</strong><p>It reads a descriptor only after observing the ordered producer update.</p></article>

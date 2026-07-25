@@ -106,6 +106,10 @@
             <li><strong>Model loading</strong><span>Upload constants and prepare executable state.</span></li>
             <li><strong>Inference</strong><span>Submit, execute, complete and validate output.</span></li>
           </ol>
+          <div class="callout">
+            <h3>These are dependency gates, not always separate time windows</h3>
+            <p>Linux can create firmware-described device objects and probe built-in drivers during kernel initialization; a probe may defer and resume when an IOMMU, clock or firmware dependency becomes ready. The ordering above states what must be true before the runtime uses the NPU.</p>
+          </div>
         </section>
 
         <section class="section" aria-labelledby="stage-details">
@@ -134,8 +138,8 @@
 
           <h3 class="sub">Gate 4 · Linux host initialization</h3>
           <div class="variant-grid">
-            <article class="variant-card"><h3>Actor and action</h3><p>Linux establishes page tables, scheduler, interrupts and timekeeping; initializes SMMU, power domains, clocks and the platform bus; then starts PID 1.</p></article>
-            <article class="variant-card"><h3>Invariant after handoff</h3><p>Host memory protection works, required resource providers are ready and userspace can start without exposing the NPU yet.</p></article>
+            <article class="variant-card"><h3>Actor and action</h3><p>Linux establishes page tables, scheduler, interrupts and timekeeping; initializes the platform bus and resource providers such as SMMU, power domains and clocks; creates firmware-described devices; then starts PID 1 after the root filesystem is ready.</p></article>
+            <article class="variant-card"><h3>Invariant after handoff</h3><p>Host memory protection works and device dependencies can resolve. NPU probe may already have run, may be deferred, or may wait for a module, but userspace receives no usable accelerator until the later gates succeed.</p></article>
             <article class="variant-card"><h3>Evidence</h3><p>Early console, memory/reserved-region map, SMMU probe, initcall timing, rootfs mount and boot-success marker after health checks.</p></article>
           </div>
 
@@ -157,7 +161,7 @@
           <ol class="sequence-rail">
             <li><strong>Power domain on; clocks prepared</strong><p>Do not access registers until the interconnect path is live.</p></li>
             <li><strong>Reserve/map MMIO; keep NPU reset asserted</strong><p>Read a hardware ID and capability register to verify the programming interface.</p></li>
-            <li><strong>Attach SMMU and set DMA mask</strong><p>No workload-facing DMA occurs before the isolation boundary exists.</p></li>
+            <li><strong>Confirm SMMU attachment and set DMA mask</strong><p>The firmware/IOMMU core normally establishes the default domain before probe. The driver verifies usable DMA configuration and creates any design-specific per-context isolation before workload-facing DMA.</p></li>
             <li><strong>Request management and completion IRQs</strong><p>Keep sources masked until queue memory and handlers are initialized.</p></li>
             <li><strong>Enter LOADING state</strong><p>Userspace sees no usable accelerator node until firmware reaches Ready.</p></li>
           </ol>

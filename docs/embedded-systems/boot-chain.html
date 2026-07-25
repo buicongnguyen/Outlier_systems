@@ -71,7 +71,7 @@
             <li><strong>Small first-stage loader</strong><p>Code-size and SRAM constraints dominate. It initializes clocks and DRAM, then loads a richer firmware stage. U-Boot systems may call these TPL or SPL; names vary.</p></li>
             <li><strong>Platform firmware / bootloader</strong><p>Discover boot media, initialize consoles and buses, apply update/recovery policy, select an OS image and assemble kernel parameters.</p></li>
             <li><strong>Load the OS payload</strong><p>Place the kernel, optional initramfs and hardware description at valid memory addresses; verify required signatures; prepare the architecture-specific entry contract.</p></li>
-            <li><strong>Transfer control to the kernel</strong><p>Pass the device tree or ACPI/UEFI information, command line and memory map. Firmware boot services end when the OS takes ownership.</p></li>
+            <li><strong>Transfer control to the kernel</strong><p>Pass the device tree or ACPI/UEFI information, command line and memory map. On a UEFI path, the OS loader calls <code>ExitBootServices()</code>; UEFI runtime services may remain available. A direct U-Boot path uses the architecture-specific Linux entry contract instead.</p></li>
             <li><strong>Kernel initialization</strong><p>Set up architecture state, memory management, scheduler, interrupts, timers, buses and initcalls; probe built-in drivers and prepare the root filesystem.</p></li>
             <li><strong>Start userspace</strong><p>Execute PID 1 from initramfs or the real root filesystem. PID 1 starts services, including the NPU runtime daemon if the design uses one.</p></li>
           </ol>

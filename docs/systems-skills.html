@@ -110,6 +110,7 @@
   </style>
 </head>
 <body>
+  <a class="skip-link" href="#main">Skip to content</a>
   <header class="topbar">
     <div>
       <p class="eyebrow">Systems study hub</p>
@@ -147,10 +148,10 @@
     </section>
 
     <div class="score-bar" id="score-bar">
-      <strong id="score-text">Score: 0 / 0</strong>
+      <strong id="score-text" aria-live="polite">Score: 0 / 0</strong>
       <p class="section-note" id="score-note"></p>
       <div class="bar-buttons">
-        <button class="bar-btn secondary" id="toggle-explain" type="button">Show all explanations</button>
+        <button class="bar-btn secondary" id="toggle-explain" type="button" aria-pressed="false">Reveal all answers</button>
         <button class="bar-btn" id="retry" type="button">Retry (reshuffle)</button>
       </div>
     </div>
@@ -710,7 +711,7 @@ HTTP/3 (QUIC over UDP):      streams independent at transport
 
       <h3 class="sub">Key terms</h3>
       <dl class="def-list">
-        <div><dt>VM vs container</dt><dd>VM: hardware virtualized, each guest runs its own kernel — strong isolation, minutes to boot, GBs. Container: processes sharing the host kernel, isolated by namespaces + cgroups — starts in ms, MBs. Different trust boundaries.</dd></div>
+        <div><dt>VM vs container</dt><dd>VM: hardware virtualized, each guest runs its own kernel — strong isolation, a full guest boot, usually a larger memory/disk footprint. Container: processes sharing the host kernel, isolated by namespaces + cgroups — usually starts much faster with less overhead. Exact startup time and size depend on the image, workload, snapshotting and platform; the trust boundary is the important distinction.</dd></div>
         <div><dt>Namespaces / cgroups</dt><dd>The two kernel features under containers: namespaces give a private view (PIDs, network, mounts, users); cgroups cap resources (CPU, memory — exceed the memory limit and the OOM killer visits).</dd></div>
         <div><dt>Image / layers</dt><dd>A container image is a stack of immutable filesystem layers plus config. Layers are cached and shared: order your Dockerfile so rarely-changing steps (deps) precede frequently-changing ones (source) for fast rebuilds.</dd></div>
         <div><dt>Registry / tags</dt><dd>Images live in registries, pulled by tag or digest. Tags are mutable pointers — <code>:latest</code> today isn't <code>:latest</code> tomorrow; deploy by digest or immutable version tags for reproducibility.</dd></div>
@@ -755,7 +756,8 @@ HTTP/3 (QUIC over UDP):      streams independent at transport
 ┌───────────────────────────┐        │      ONE shared kernel     │
 │       host / hardware     │        └────────────────────────────┘
 └───────────────────────────┘
-boot: minutes vs milliseconds; size: GBs vs MBs
+startup: full guest boot vs process launch (platform-dependent)
+footprint: guest kernel + OS vs shared host kernel
 isolation: hardware-strong vs kernel-shared (hostile tenants → VMs,
            gVisor/Firecracker = middle ground)</pre>
 
@@ -849,7 +851,7 @@ failure modes to design for:
   </main>
 
   <footer>
-    <p>Last updated: 2026-07-04. Styles shared with the Isaac Sim study hub.</p>
+    <p>Last updated: 2026-07-25. Styles shared with the Isaac Sim study hub.</p>
   </footer>
 
 <script>
@@ -1120,12 +1122,17 @@ function renderQuestion(container, item, number, sectionKey) {
   if (item.type === "order") return renderOrder(container, item, number, sectionKey);
   const card = el("article", "quiz-card");
   const title = el("p", "q", `Q${number}. ${item.q}`);
+  title.id = `question-${sectionKey}-${number}`;
   if (item.type === "code") title.appendChild(el("span", "qtype-tag", "complete the code"));
   if (item.level) title.appendChild(el("span", "level-tag", "senior+"));
   card.appendChild(title);
   if (item.code) appendSnippet(card, item.code);
   const optionsBox = el("div", "options");
+  optionsBox.setAttribute("role", "group");
+  optionsBox.setAttribute("aria-labelledby", title.id);
   const explain = el("div", "explain");
+  explain.setAttribute("role", "status");
+  explain.setAttribute("aria-live", "polite");
   explain.appendChild(document.createTextNode(item.explain));
 
   const buttons = [];
@@ -1158,25 +1165,36 @@ function renderQuestion(container, item, number, sectionKey) {
 function renderMulti(container, item, number, sectionKey) {
   const card = el("article", "quiz-card");
   const title = el("p", "q", `Q${number}. ${item.q}`);
+  title.id = `question-${sectionKey}-${number}`;
   title.appendChild(el("span", "qtype-tag", "select ALL that apply"));
   if (item.level) title.appendChild(el("span", "level-tag", "senior+"));
   card.appendChild(title);
   const optionsBox = el("div", "options");
+  optionsBox.setAttribute("role", "group");
+  optionsBox.setAttribute("aria-labelledby", title.id);
   const explain = el("div", "explain");
+  explain.setAttribute("role", "status");
+  explain.setAttribute("aria-live", "polite");
   explain.appendChild(document.createTextNode(item.explain));
 
   const buttons = [];
+  const check = el("button", "check-btn", "Check answer");
+  check.type = "button";
+  check.disabled = true;
   for (const [text, isCorrect] of shuffle(item.options)) {
     const btn = el("button", "", text);
     btn.type = "button";
     btn.dataset.correct = isCorrect ? "1" : "0";
-    btn.addEventListener("click", () => btn.classList.toggle("selected"));
+    btn.setAttribute("aria-pressed", "false");
+    btn.addEventListener("click", () => {
+      const selected = btn.classList.toggle("selected");
+      btn.setAttribute("aria-pressed", String(selected));
+      check.disabled = !buttons.some(option => option.classList.contains("selected"));
+    });
     buttons.push(btn);
     optionsBox.appendChild(btn);
   }
 
-  const check = el("button", "check-btn", "Check answer");
-  check.type = "button";
   check.addEventListener("click", () => {
     state[sectionKey].answered += 1;
     let ok = true;
@@ -1206,11 +1224,16 @@ function renderMulti(container, item, number, sectionKey) {
 function renderOrder(container, item, number, sectionKey) {
   const card = el("article", "quiz-card");
   const title = el("p", "q", `Q${number}. ${item.q}`);
+  title.id = `question-${sectionKey}-${number}`;
   title.appendChild(el("span", "qtype-tag", "click the steps in order"));
   if (item.level) title.appendChild(el("span", "level-tag", "senior+"));
   card.appendChild(title);
   const optionsBox = el("div", "options");
+  optionsBox.setAttribute("role", "group");
+  optionsBox.setAttribute("aria-labelledby", title.id);
   const explain = el("div", "explain");
+  explain.setAttribute("role", "status");
+  explain.setAttribute("aria-live", "polite");
   explain.appendChild(document.createTextNode(
     item.explain + " Correct order: " + item.steps.map((s, i) => `(${i + 1}) ${s}`).join(" → ") + "."));
 
@@ -1222,6 +1245,7 @@ function renderOrder(container, item, number, sectionKey) {
   const buttons = shuffle(item.steps.map((text, idx) => ({ text, idx }))).map(step => {
     const btn = el("button", "step-btn");
     btn.type = "button";
+    btn.setAttribute("aria-pressed", "false");
     const badge = el("span", "step-badge", "");
     badge.style.visibility = "hidden";
     btn.appendChild(badge);
@@ -1236,6 +1260,7 @@ function renderOrder(container, item, number, sectionKey) {
         bd.textContent = p >= 0 ? String(p + 1) : "";
         bd.style.visibility = p >= 0 ? "visible" : "hidden";
         b.classList.toggle("selected", p >= 0);
+        b.setAttribute("aria-pressed", String(p >= 0));
       }
       check.disabled = seq.length !== buttons.length;
     });
@@ -1268,6 +1293,9 @@ function renderOrder(container, item, number, sectionKey) {
 }
 
 function renderAll() {
+  document.getElementById("main").classList.remove("show-all");
+  toggleBtn.textContent = "Reveal all answers";
+  toggleBtn.setAttribute("aria-pressed", "false");
   for (const quizBox of document.querySelectorAll(".quiz")) {
     const key = quizBox.dataset.section;
     state[key] = { answered: 0, correct: 0, total: 0 };
@@ -1284,11 +1312,13 @@ function renderAll() {
 const toggleBtn = document.getElementById("toggle-explain");
 toggleBtn.addEventListener("click", () => {
   const on = document.getElementById("main").classList.toggle("show-all");
-  toggleBtn.textContent = on ? "Hide explanations" : "Show all explanations";
+  toggleBtn.textContent = on ? "Hide revealed answers" : "Reveal all answers";
+  toggleBtn.setAttribute("aria-pressed", String(on));
 });
 
 document.getElementById("retry").addEventListener("click", renderAll);
 renderAll();
 </script>
+<script src="theme-toggle.js"></script>
 </body>
 </html>

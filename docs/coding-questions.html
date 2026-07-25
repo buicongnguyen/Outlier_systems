@@ -31,6 +31,7 @@
   </style>
 </head>
 <body>
+  <a class="skip-link" href="#main">Skip to content</a>
   <header class="topbar">
     <div>
       <p class="eyebrow">Systems study hub</p>
@@ -240,6 +241,8 @@ def top_k(nums, k):
             heapq.nlargest(k, counts.items(), key=lambda kv: kv[1])]
 
 def top_k_bucket(nums, k):                          # O(n) version
+    if k &lt;= 0:
+        return []
     counts = Counter(nums)
     buckets = [[] for _ in range(len(nums) + 1)]    # index = frequency
     for val, c in counts.items():
@@ -248,7 +251,8 @@ def top_k_bucket(nums, k):                          # O(n) version
     for c in range(len(buckets) - 1, 0, -1):
         for val in buckets[c]:
             out.append(val)
-            if len(out) == k: return out</pre>
+            if len(out) == k: return out
+    return out</pre>
           <span class="complexity">O(n log k) heap / O(n) bucket</span>
           <h4>Pitfalls &amp; follow-ups</h4>
           <p>Say why it beats full sorting (O(n log n) wastes work ordering elements you'll discard). Follow-ups: top-k in a stream (keep the k-heap), across sharded logs (local top-k, then merge — connects to the distributed section of this hub).</p>
@@ -277,6 +281,8 @@ def top_k_bucket(nums, k):                          # O(n) version
 
 class LRUCache:
     def __init__(self, capacity):
+        if capacity &lt;= 0:
+            raise ValueError("capacity must be positive")
         self.cap = capacity
         self.od = OrderedDict()          # front = oldest, end = newest
 
@@ -311,6 +317,8 @@ from collections import deque
 
 class BoundedQueue:
     def __init__(self, capacity):
+        if capacity &lt;= 0:
+            raise ValueError("capacity must be positive")
         self.buf = deque()
         self.cap = capacity
         self.lock = threading.Lock()
@@ -350,6 +358,8 @@ class BoundedQueue:
 
 class TokenBucket:
     def __init__(self, rate, capacity):
+        if rate &lt;= 0 or capacity &lt;= 0:
+            raise ValueError("rate and capacity must be positive")
         self.rate = rate                  # tokens added per second
         self.cap = capacity               # max burst
         self.tokens = capacity
@@ -385,6 +395,8 @@ class TokenBucket:
 
 def retry(fn, max_attempts=5, base=0.1, cap=10.0,
           retryable=(TimeoutError, ConnectionError)):
+    if max_attempts &lt;= 0 or base &lt; 0 or cap &lt; 0:
+        raise ValueError("invalid retry policy")
     for attempt in range(max_attempts):
         try:
             return fn()
@@ -411,27 +423,38 @@ def retry(fn, max_attempts=5, base=0.1, cap=10.0,
           <pre class="code">import bisect, hashlib
 
 def _h(s):
-    return int(hashlib.md5(s.encode()).hexdigest(), 16) % (2 ** 32)
+    data = s if isinstance(s, bytes) else str(s).encode()
+    return int.from_bytes(hashlib.sha256(data).digest()[:4], "big")
 
 class HashRing:
     def __init__(self, vnodes=100):
+        if vnodes &lt;= 0:
+            raise ValueError("vnodes must be positive")
         self.vnodes = vnodes
-        self.ring = []            # sorted list of (hash, node)
+        self.ring = []            # sorted (hash, vnode token, physical node)
+        self.nodes = set()
 
     def add_node(self, node):
+        if node in self.nodes: return       # idempotent membership update
+        entries = []
         for i in range(self.vnodes):
-            bisect.insort(self.ring, (_h(f"{node}#{i}"), node))
+            token = f"{node}#{i}"
+            entries.append((_h(token), token, node))
+        self.ring.extend(entries)
+        self.ring.sort()                    # list insertion itself is O(V)
+        self.nodes.add(node)
 
     def remove_node(self, node):
-        self.ring = [(h, n) for h, n in self.ring if n != node]
+        self.ring = [entry for entry in self.ring if entry[2] != node]
+        self.nodes.discard(node)
 
     def get_node(self, key):
         if not self.ring: return None
-        i = bisect.bisect(self.ring, (_h(key), chr(0x10FFFF)))
-        return self.ring[i % len(self.ring)][1]   # wrap = the "circle"</pre>
-          <span class="complexity">O(log V) lookup, O(V log V) add — V = total virtual nodes</span>
+        i = bisect.bisect_left(self.ring, (_h(key), "", ""))
+        return self.ring[i % len(self.ring)][2]   # wrap = the "circle"</pre>
+          <span class="complexity">O(log V) lookup; O((V+R) log(V+R)) add; O(V) remove — R = vnodes added</span>
           <h4>Pitfalls &amp; follow-ups</h4>
-          <p>Without virtual nodes, two physical nodes split the circle terribly unevenly, and removal dumps an entire arc on one survivor. The modulo wrap at the end IS the ring. Follow-ups: weighted nodes (more vnodes = more traffic), how this connects to the shard-key discussion in the databases section, and bounded-load consistent hashing.</p>
+          <p>Without virtual nodes, two physical nodes split the circle terribly unevenly, and removal dumps an entire arc on one survivor. Use a stable hash rather than Python's process-randomized <code>hash()</code>. <code>bisect_left</code> selects the first point at or clockwise from the key; the modulo wrap at the end is the ring. Follow-ups: weighted nodes (more vnodes = more traffic), how this connects to the shard-key discussion in the databases section, and bounded-load consistent hashing.</p>
         </div>
       </article>
     </section>
@@ -451,25 +474,49 @@ class HashRing:
   </main>
 
   <footer>
-    <p>Last updated: 2026-07-05. Styles shared with the Isaac Sim study hub.</p>
+    <p>Last updated: 2026-07-25. Styles shared with the Isaac Sim study hub.</p>
   </footer>
 
 <script>
-for (const btn of document.querySelectorAll(".sol-btn")) {
-  btn.addEventListener("click", () => {
-    const sol = btn.nextElementSibling;
-    const on = sol.classList.toggle("show");
-    btn.textContent = on ? "Hide solution" : "Show solution";
-  });
-}
+const solutionButtons = [...document.querySelectorAll(".sol-btn")];
+const solutions = [...document.querySelectorAll(".solution")];
 const allBtn = document.getElementById("toggle-all");
+
+function setSolutionState(btn, solution, showing) {
+  solution.classList.toggle("show", showing);
+  btn.textContent = showing ? "Hide solution" : "Show solution";
+  btn.setAttribute("aria-expanded", String(showing));
+}
+
+function syncAllButton() {
+  const allShowing = solutions.every(solution => solution.classList.contains("show"));
+  allBtn.dataset.on = allShowing ? "1" : "0";
+  allBtn.textContent = allShowing ? "Hide all solutions" : "Show all solutions";
+  allBtn.setAttribute("aria-pressed", String(allShowing));
+}
+
+solutionButtons.forEach((btn, index) => {
+  const solution = btn.nextElementSibling;
+  const solutionId = `solution-${index + 1}`;
+  solution.id = solutionId;
+  solution.setAttribute("role", "region");
+  solution.setAttribute("aria-label", `Solution ${index + 1}`);
+  btn.setAttribute("aria-controls", solutionId);
+  btn.setAttribute("aria-expanded", "false");
+  btn.addEventListener("click", () => {
+    setSolutionState(btn, solution, !solution.classList.contains("show"));
+    syncAllButton();
+  });
+});
+
+allBtn.setAttribute("aria-controls", solutions.map(solution => solution.id).join(" "));
+allBtn.setAttribute("aria-pressed", "false");
 allBtn.addEventListener("click", () => {
   const showing = allBtn.dataset.on === "1";
-  for (const sol of document.querySelectorAll(".solution")) sol.classList.toggle("show", !showing);
-  for (const btn of document.querySelectorAll(".sol-btn")) btn.textContent = showing ? "Show solution" : "Hide solution";
-  allBtn.dataset.on = showing ? "0" : "1";
-  allBtn.textContent = showing ? "Show all solutions" : "Hide all solutions";
+  solutionButtons.forEach((btn, index) => setSolutionState(btn, solutions[index], !showing));
+  syncAllButton();
 });
 </script>
+<script src="theme-toggle.js"></script>
 </body>
 </html>

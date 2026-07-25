@@ -85,7 +85,7 @@
             <li><strong>Match the device</strong><p>The bus finds an ID match and invokes the driver's probe path. A match says the driver understands the programming interface, not that the device is healthy.</p></li>
             <li><strong>Enable resources</strong><p>Enable the PCI function or runtime-power domain, acquire regulators/clocks, deassert prerequisite resets and reserve MMIO regions.</p></li>
             <li><strong>Map control registers</strong><p>Map BAR or platform MMIO apertures with kernel helpers. Use MMIO accessors and respect posted-write/readback requirements.</p></li>
-            <li><strong>Set DMA capabilities</strong><p>Negotiate the coherent and streaming DMA mask. Attach the device to the intended IOMMU domain before accepting workloads.</p></li>
+            <li><strong>Set DMA capabilities</strong><p>Negotiate the coherent and streaming DMA mask. Confirm that the firmware-derived DMA configuration and default IOMMU domain are active; create additional per-context domains or PASID/SVA state only when the design requires them.</p></li>
             <li><strong>Allocate interrupts</strong><p>Request MSI/MSI-X or wired IRQs, establish handlers and keep interrupts masked until queues and status state are valid.</p></li>
             <li><strong>Create software state</strong><p>Initialize locks, state machine, reset generation, telemetry and lifetime references before exposing userspace interfaces.</p></li>
           </ol>
