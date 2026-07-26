@@ -289,17 +289,45 @@
     ]
   };
 
-  function createQuestion(question, index, quizId, onAnswered) {
+  function showResult(card, fieldset, check, feedback, question, selectedIndex) {
+    const correct = selectedIndex === question.answer;
+    card.classList.add(correct ? "is-correct" : "is-incorrect");
+    feedback.classList.add("show");
+    feedback.classList.toggle("bad", !correct);
+
+    const verdict = document.createElement("strong");
+    verdict.textContent = correct
+      ? "Correct."
+      : `Not quite. Correct answer: ${question.options[question.answer]}`;
+    const explanation = document.createElement("p");
+    explanation.textContent = question.explain;
+    feedback.replaceChildren(verdict, explanation);
+
+    fieldset.querySelectorAll("input").forEach((input) => {
+      const optionIndex = Number(input.value);
+      input.checked = optionIndex === selectedIndex;
+      input.disabled = true;
+      const label = input.closest(".quiz-option");
+      label.classList.toggle("correct-answer", optionIndex === question.answer);
+      label.classList.toggle("selected-wrong", optionIndex === selectedIndex && !correct);
+    });
+    check.disabled = true;
+    check.textContent = "Answered";
+    return correct;
+  }
+
+  function createQuestion(question, index, quizId, savedAnswer, onAnswered) {
     const card = document.createElement("article");
     card.className = "quiz-card";
 
     const heading = document.createElement("h3");
+    heading.id = `${quizId}-question-${index + 1}`;
     heading.textContent = `${index + 1}. ${question.q}`;
     card.appendChild(heading);
 
     const fieldset = document.createElement("fieldset");
     fieldset.className = "quiz-options";
-    fieldset.setAttribute("aria-label", `Question ${index + 1} answers`);
+    fieldset.setAttribute("aria-labelledby", heading.id);
 
     question.options.forEach((option, optionIndex) => {
       const label = document.createElement("label");
@@ -330,35 +358,21 @@
     feedback.setAttribute("aria-live", "polite");
     card.appendChild(feedback);
 
-    fieldset.addEventListener("change", () => {
-      check.disabled = false;
+    fieldset.addEventListener("change", (event) => {
+      check.disabled = !event.target.matches("input:checked");
     });
 
     check.addEventListener("click", () => {
       const selected = fieldset.querySelector("input:checked");
       if (!selected) return;
-
       const selectedIndex = Number(selected.value);
-      const correct = selectedIndex === question.answer;
-      card.classList.add(correct ? "is-correct" : "is-incorrect");
-      feedback.classList.add("show");
-      if (!correct) feedback.classList.add("bad");
-
-      const verdict = document.createElement("strong");
-      verdict.textContent = correct
-        ? "Correct."
-        : `Not quite. Correct answer: ${question.options[question.answer]}`;
-      const explanation = document.createElement("p");
-      explanation.textContent = question.explain;
-      feedback.replaceChildren(verdict, explanation);
-
-      fieldset.querySelectorAll("input").forEach((input) => {
-        input.disabled = true;
-      });
-      check.disabled = true;
-      check.textContent = "Answered";
-      onAnswered(correct);
+      const correct = showResult(card, fieldset, check, feedback, question, selectedIndex);
+      onAnswered(index, selectedIndex, correct);
     }, { once: true });
+
+    if (savedAnswer) {
+      showResult(card, fieldset, check, feedback, question, savedAnswer.selected);
+    }
 
     return card;
   }
@@ -366,47 +380,107 @@
   function initializeQuiz(shell) {
     const quizId = shell.dataset.quiz;
     const questions = quizzes[quizId];
-    if (!questions) return;
+    const progress = globalThis.EmbeddedProgress;
+    if (!questions || !progress) return;
 
     const score = document.createElement("p");
     score.className = "quiz-score";
     score.setAttribute("aria-live", "polite");
 
-    const reset = document.createElement("button");
-    reset.type = "button";
-    reset.className = "quiz-reset";
-    reset.textContent = "Reset quiz";
+    const best = document.createElement("p");
+    best.className = "quiz-best";
+
+    const scoreGroup = document.createElement("div");
+    scoreGroup.className = "quiz-score-group";
+    scoreGroup.append(score, best);
+
+    const restart = document.createElement("button");
+    restart.type = "button";
+    restart.className = "quiz-reset";
+    restart.textContent = "Restart attempt";
 
     const toolbar = document.createElement("div");
     toolbar.className = "quiz-toolbar";
-    toolbar.append(score, reset);
+    toolbar.append(scoreGroup, restart);
 
     const list = document.createElement("div");
     list.className = "quiz-list";
-    shell.replaceChildren(toolbar, list);
 
-    let answered = 0;
-    let correct = 0;
+    const completion = document.createElement("div");
+    completion.className = "quiz-completion";
+    completion.setAttribute("role", "status");
+    completion.setAttribute("aria-live", "polite");
+    completion.hidden = true;
+
+    shell.replaceChildren(toolbar, list, completion);
+
+    let current = progress.getTopic(quizId);
 
     function updateScore() {
-      score.textContent = `Score: ${correct}/${answered} answered · ${questions.length} total`;
+      const remaining = questions.length - current.answered;
+      score.textContent = current.answered === 0
+        ? `Current attempt: 0/${questions.length} answered`
+        : `Current attempt: ${current.currentCorrect}/${current.answered} correct · ${remaining} remaining`;
+
+      best.textContent = current.best === null
+        ? "Best score: not completed yet · answers save automatically"
+        : `Best score: ${current.best}/${questions.length} · ${current.attempts} ${current.attempts === 1 ? "attempt" : "attempts"}`;
+
+      restart.disabled = current.answered === 0;
+      restart.textContent = current.currentComplete ? "Try again" : "Restart attempt";
+      completion.hidden = !current.currentComplete;
+      if (current.currentComplete) {
+        const perfect = current.currentCorrect === questions.length;
+        completion.textContent = perfect
+          ? "Checkpoint complete with a perfect score. Continue to the next branch when you can explain every answer in your own words."
+          : `Checkpoint complete: ${current.currentCorrect}/${questions.length}. Review the highlighted answers, then try again to improve your best score.`;
+      }
     }
 
     function render() {
-      answered = 0;
-      correct = 0;
+      current = progress.getTopic(quizId);
       list.replaceChildren();
       questions.forEach((question, index) => {
-        list.appendChild(createQuestion(question, index, quizId, (wasCorrect) => {
-          answered += 1;
-          if (wasCorrect) correct += 1;
+        const storedAnswer = current.current.answers[String(index)] ?? null;
+        const savedAnswer = storedAnswer && storedAnswer.selected < question.options.length
+          ? storedAnswer
+          : null;
+        list.appendChild(createQuestion(question, index, quizId, savedAnswer, (
+          questionIndex,
+          selectedIndex,
+          wasCorrect,
+        ) => {
+          current = progress.recordAnswer(
+            quizId,
+            questionIndex,
+            selectedIndex,
+            wasCorrect,
+            questions.length,
+          );
           updateScore();
+          globalThis.dispatchEvent(new CustomEvent("embedded-progress-change"));
         }));
       });
       updateScore();
     }
 
-    reset.addEventListener("click", render);
+    restart.addEventListener("click", () => {
+      if (current.answered > 0 && !current.currentComplete) {
+        const confirmed = globalThis.confirm(
+          `Restart this attempt? ${current.answered} saved ${current.answered === 1 ? "answer" : "answers"} will be cleared, but your best score will remain.`,
+        );
+        if (!confirmed) return;
+      }
+      current = progress.restartTopic(quizId);
+      globalThis.dispatchEvent(new CustomEvent("embedded-progress-change"));
+      render();
+      shell.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+
+    globalThis.addEventListener("storage", (event) => {
+      if (event.key === progress.STORAGE_KEY) render();
+    });
+
     render();
   }
 

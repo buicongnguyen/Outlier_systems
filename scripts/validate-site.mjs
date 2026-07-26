@@ -93,6 +93,37 @@ for (const file of htmlFiles) {
     fail(`${relative(file)}: expected exactly one theme-toggle.js script, found ${themeScripts.length}`);
   }
 
+  const pageName = relative(file);
+  if (pageName.startsWith("docs/embedded-systems/")) {
+    const scriptSources = pageTags
+      .filter((tag) => tag.name === "script" && tag.attrs.src)
+      .map((tag) => tag.attrs.src);
+    const required = ["progress-state.js", "learning-progress.js"];
+    for (const source of required) {
+      if (scriptSources.filter((item) => item === source).length !== 1) {
+        fail(`${pageName}: expected exactly one ${source} script`);
+      }
+    }
+
+    const hasQuiz = pageTags.some((tag) => tag.attrs["data-quiz"]);
+    const dashboards = pageTags.filter((tag) => tag.attrs["data-learning-dashboard"] !== undefined);
+    const expectedDashboards = pageName === "docs/embedded-systems/index.html" ? 1 : 0;
+    if (dashboards.length !== expectedDashboards) {
+      fail(`${pageName}: expected ${expectedDashboards} learning progress dashboard(s)`);
+    }
+    const quizCount = scriptSources.filter((source) => source === "quiz.js").length;
+    if (quizCount !== (hasQuiz ? 1 : 0)) {
+      fail(`${pageName}: quiz.js inclusion does not match the page quiz shell`);
+    }
+
+    const stateIndex = scriptSources.indexOf("progress-state.js");
+    const uiIndex = scriptSources.indexOf("learning-progress.js");
+    const quizIndex = scriptSources.indexOf("quiz.js");
+    if (stateIndex > uiIndex || (hasQuiz && uiIndex > quizIndex)) {
+      fail(`${pageName}: embedded progress scripts are in the wrong dependency order`);
+    }
+  }
+
   const inlineScripts = [...html.matchAll(/<script\b(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi)];
   inlineScripts.forEach((match, index) => {
     try {
@@ -177,7 +208,9 @@ function validateQuizSet(name, quizzes, expectedKeys, expectedPerSection, mainFo
       if (typeof question.explain !== "string" || !question.explain.trim()) fail(`${label}: missing explanation`);
 
       if (!mainFormat) {
-        if (!Array.isArray(question.options) || question.options.length < 2) fail(`${label}: too few options`);
+        if (!Array.isArray(question.options) || question.options.length !== 4) {
+          fail(`${label}: embedded MCQ must have exactly four options`);
+        }
         if (!Number.isInteger(question.answer) || question.answer < 0 || question.answer >= question.options.length) {
           fail(`${label}: answer index is out of range`);
         }
@@ -206,6 +239,113 @@ function validateQuizSet(name, quizzes, expectedKeys, expectedPerSection, mainFo
   }
 }
 
+function createMemoryStorage() {
+  const values = new Map();
+  return {
+    getItem(key) {
+      return values.has(key) ? values.get(key) : null;
+    },
+    setItem(key, value) {
+      values.set(key, String(value));
+    },
+    removeItem(key) {
+      values.delete(key);
+    },
+  };
+}
+
+function validateProgressState() {
+  const source = fs.readFileSync(
+    path.join(docsRoot, "embedded-systems", "progress-state.js"),
+    "utf8",
+  );
+  const localStorage = createMemoryStorage();
+  const context = { localStorage };
+  vm.runInNewContext(source, context);
+  const progress = context.EmbeddedProgress;
+
+  if (!progress || progress.TOPICS.length !== 5) {
+    fail("embeddedProgress: expected five topic definitions");
+    return;
+  }
+
+  let summary = progress.summary();
+  if (summary.started !== 0 || summary.completed !== 0 || summary.percent !== 0) {
+    fail("embeddedProgress: fresh state should have no started or completed topics");
+  }
+
+  progress.recordAnswer("rtos", 0, 1, true, 5);
+  progress.recordAnswer("rtos", 0, 0, false, 5);
+  let topic = progress.getTopic("rtos");
+  if (topic.answered !== 1 || topic.currentCorrect !== 1) {
+    fail("embeddedProgress: duplicate answers must not replace the first saved answer");
+  }
+
+  for (let index = 1; index < 5; index += 1) {
+    progress.recordAnswer("rtos", index, 1, index < 4, 5);
+  }
+  topic = progress.getTopic("rtos");
+  if (!topic.currentComplete || !topic.completedEver || topic.best !== 4 || topic.attempts !== 1) {
+    fail("embeddedProgress: completing an attempt should save its score and attempt count");
+  }
+
+  progress.restartTopic("rtos");
+  topic = progress.getTopic("rtos");
+  if (topic.answered !== 0 || topic.best !== 4 || !topic.completedEver) {
+    fail("embeddedProgress: restarting should clear current answers but preserve the best score");
+  }
+
+  for (let index = 0; index < 5; index += 1) {
+    progress.recordAnswer("rtos", index, 0, false, 5);
+  }
+  topic = progress.getTopic("rtos");
+  if (topic.best !== 4 || topic.attempts !== 2) {
+    fail("embeddedProgress: a lower retry score must not replace the best score");
+  }
+
+  progress.recordAnswer("boot", 0, 1, true, 5);
+  summary = progress.summary();
+  if (summary.started !== 2 || summary.completed !== 1 || summary.bestCorrect !== 4) {
+    fail("embeddedProgress: aggregate summary is inconsistent");
+  }
+
+  let rejectedInvalidAnswer = false;
+  try {
+    progress.recordAnswer("unknown", 0, 0, true, 5);
+  } catch {
+    rejectedInvalidAnswer = true;
+  }
+  if (!rejectedInvalidAnswer) fail("embeddedProgress: invalid topic answers must be rejected");
+
+  let rejectedInvalidOption = false;
+  try {
+    progress.recordAnswer("boot", 1, 4, true, 5);
+  } catch {
+    rejectedInvalidOption = true;
+  }
+  if (!rejectedInvalidOption) fail("embeddedProgress: invalid option indexes must be rejected");
+
+  localStorage.removeItem(progress.STORAGE_KEY);
+  summary = progress.summary();
+  if (summary.started !== 0 || summary.completed !== 0) {
+    fail("embeddedProgress: storage changes from another tab should replace stale in-memory state");
+  }
+
+  progress.recordAnswer("boot", 0, 1, true, 5);
+  progress.clearAll();
+  if (progress.summary().started !== 0) {
+    fail("embeddedProgress: clearing state should remove all saved progress");
+  }
+
+  const memoryOnlyContext = {};
+  vm.runInNewContext(source, memoryOnlyContext);
+  memoryOnlyContext.EmbeddedProgress.recordAnswer("boot", 0, 1, true, 5);
+  memoryOnlyContext.EmbeddedProgress.recordAnswer("boot", 1, 1, true, 5);
+  if (memoryOnlyContext.EmbeddedProgress.getTopic("boot").answered !== 2) {
+    fail("embeddedProgress: quiz state should remain usable when browser storage is unavailable");
+  }
+}
+
 try {
   validateQuizSet("mainQuiz", loadMainQuizzes(), ["db", "os", "dist", "net", "infra"], 20, true);
   validateQuizSet(
@@ -215,8 +355,9 @@ try {
     5,
     false,
   );
+  validateProgressState();
 } catch (error) {
-  fail(`quiz data could not be loaded: ${error.message}`);
+  fail(`site data could not be validated: ${error.message}`);
 }
 
 if (failures.length) {
@@ -226,6 +367,7 @@ if (failures.length) {
 } else {
   console.log(
     `Site validation passed: ${htmlFiles.length} HTML pages, ` +
-    `${walk(docsRoot, ".js").length} JavaScript files, 125 quiz questions.`,
+    `${walk(docsRoot, ".js").length} JavaScript files, 125 quiz questions, ` +
+    "and persistent progress transitions.",
   );
 }

@@ -18,6 +18,7 @@
     <nav aria-label="Site navigation">
       <a href="../index.html">Main Hub</a>
       <a href="../systems-skills.html">Systems Skills</a>
+      <a href="#progress">My Progress</a>
       <a href="end-to-end.html">Host + NPU Case Study</a>
     </nav>
   </header>
@@ -49,7 +50,8 @@
           <p>
             Follow the path from immutable Boot ROM through trusted firmware, Linux and the accelerator driver,
             then into NPU firmware, protected DMA queues, the userspace runtime, model loading and inference.
-            Each branch ends with a five-question checkpoint and detailed explanations.
+            Each branch ends with a five-question checkpoint and detailed explanations. Answers, completed
+            checkpoints and best scores resume automatically on this device.
           </p>
           <div class="tag-row" aria-label="Topics">
             <span class="topic-tag">RTOS</span>
@@ -59,6 +61,26 @@
             <span class="topic-tag">DMA + IOMMU</span>
             <span class="topic-tag">Command queues</span>
           </div>
+        </section>
+
+        <section id="progress" class="section" aria-labelledby="progress-title" data-learning-dashboard>
+          <div class="progress-header">
+            <div>
+              <p class="eyebrow">Saved in this browser</p>
+              <h2 id="progress-title">Your learning progress</h2>
+            </div>
+            <button class="progress-clear" type="button" data-clear-progress>Clear saved progress</button>
+          </div>
+          <div class="progress-summary" role="status" aria-live="polite">
+            <strong data-progress-headline>0 of 5 checkpoints complete</strong>
+            <p data-progress-detail>Start with RTOS or choose the branch that matches your current work.</p>
+            <progress value="0" max="5" aria-label="0 of 5 checkpoints complete"></progress>
+          </div>
+          <div class="progress-topics" data-progress-topics></div>
+          <p class="progress-privacy">
+            Quiz answers and best scores stay on this device. Nothing is uploaded and no account is required.
+          </p>
+          <noscript>Enable JavaScript to save checkpoint progress in this browser.</noscript>
         </section>
 
         <section class="section" aria-labelledby="system-map">
@@ -190,6 +212,8 @@
   <footer>
     <p>Embedded Systems &amp; NPU branch · structured for offline study and interview review.</p>
   </footer>
+  <script src="progress-state.js"></script>
+  <script src="learning-progress.js"></script>
   <script src="../theme-toggle.js"></script>
 </body>
 </html>
