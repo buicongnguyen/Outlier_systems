@@ -92,6 +92,10 @@ for (const file of htmlFiles) {
   if (themeScripts.length !== 1) {
     fail(`${relative(file)}: expected exactly one theme-toggle.js script, found ${themeScripts.length}`);
   }
+  const headSource = html.match(/<head\b[^>]*>([\s\S]*?)<\/head>/i)?.[1] ?? "";
+  if (!/<script\b[^>]*\bsrc=["'][^"']*theme-toggle\.js["'][^>]*><\/script>/i.test(headSource)) {
+    fail(`${relative(file)}: theme-toggle.js must load in <head> to prevent a saved-theme flash`);
+  }
 
   const pageName = relative(file);
   if (pageName.startsWith("docs/embedded-systems/")) {
@@ -222,12 +226,23 @@ function validateQuizSet(name, quizzes, expectedKeys, expectedPerSection, mainFo
       if (type === "order") {
         if (!Array.isArray(question.steps) || question.steps.length < 2) fail(`${label}: order question needs steps`);
         if (new Set(question.steps).size !== question.steps.length) fail(`${label}: duplicate ordering steps`);
+        if (question.steps?.some((step) => typeof step !== "string" || !step.trim())) {
+          fail(`${label}: ordering steps must be non-empty strings`);
+        }
         return;
       }
 
       if (!Array.isArray(question.options) || question.options.length < 2) {
         fail(`${label}: too few options`);
         return;
+      }
+      if (question.options.some((option) =>
+        !Array.isArray(option) ||
+        typeof option[0] !== "string" ||
+        !option[0].trim() ||
+        typeof option[1] !== "boolean"
+      )) {
+        fail(`${label}: each option must contain non-empty text and a boolean answer flag`);
       }
       const answerFlags = question.options.map((option) => Array.isArray(option) && option[1] === true);
       if (type === "multi") {
@@ -252,6 +267,18 @@ function createMemoryStorage() {
       values.delete(key);
     },
   };
+}
+
+function contrastRatio(first, second) {
+  function luminance(hex) {
+    const channels = [1, 3, 5].map((offset) => Number.parseInt(hex.slice(offset, offset + 2), 16) / 255);
+    const linear = channels.map((channel) =>
+      channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4);
+    return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2];
+  }
+
+  const values = [luminance(first), luminance(second)].sort((a, b) => b - a);
+  return (values[0] + 0.05) / (values[1] + 0.05);
 }
 
 function validateProgressState() {
@@ -332,6 +359,21 @@ function validateProgressState() {
   }
 
   progress.recordAnswer("boot", 0, 1, true, 5);
+  const reloadedContext = { localStorage };
+  vm.runInNewContext(source, reloadedContext);
+  if (reloadedContext.EmbeddedProgress.getTopic("boot").answered !== 1) {
+    fail("embeddedProgress: a new page load should recover persisted answers");
+  }
+
+  localStorage.setItem(progress.STORAGE_KEY, JSON.stringify({
+    version: 999,
+    topics: { boot: { total: 5, best: 5, attempts: 1, current: { answers: {} } } },
+  }));
+  if (progress.summary().started !== 0) {
+    fail("embeddedProgress: incompatible storage schema versions must be ignored");
+  }
+
+  progress.recordAnswer("boot", 0, 1, true, 5);
   progress.clearAll();
   if (progress.summary().started !== 0) {
     fail("embeddedProgress: clearing state should remove all saved progress");
@@ -346,6 +388,120 @@ function validateProgressState() {
   }
 }
 
+function validateThemeState() {
+  const source = fs.readFileSync(path.join(docsRoot, "theme-toggle.js"), "utf8");
+
+  function loadTheme(initialTheme, prefersLight) {
+    let savedTheme = initialTheme;
+    const windowListeners = new Map();
+    const documentListeners = new Map();
+    const documentElement = { dataset: {} };
+    const context = {
+      localStorage: {
+        getItem() {
+          return savedTheme;
+        },
+        setItem(_key, value) {
+          savedTheme = value;
+        },
+      },
+      matchMedia() {
+        return { matches: prefersLight, addEventListener() {} };
+      },
+      addEventListener(type, listener) {
+        windowListeners.set(type, listener);
+      },
+      document: {
+        documentElement,
+        readyState: "loading",
+        querySelector() {
+          return null;
+        },
+        addEventListener(type, listener) {
+          documentListeners.set(type, listener);
+        },
+      },
+    };
+    vm.runInNewContext(source, context);
+    return {
+      documentElement,
+      documentListeners,
+      setSavedTheme(value) {
+        savedTheme = value;
+      },
+      windowListeners,
+    };
+  }
+
+  const systemDefault = loadTheme(null, true);
+  if (systemDefault.documentElement.dataset.siteTheme !== "light") {
+    fail("themeToggle: first visit should honor the operating-system color preference");
+  }
+  if (!systemDefault.documentListeners.has("DOMContentLoaded")) {
+    fail("themeToggle: loading from <head> must defer button creation until the document is ready");
+  }
+
+  const persisted = loadTheme("dark", true);
+  if (persisted.documentElement.dataset.siteTheme !== "dark") {
+    fail("themeToggle: a saved theme should override the operating-system preference");
+  }
+  persisted.setSavedTheme("light");
+  persisted.windowListeners.get("storage")?.({ key: "site-color-theme" });
+  if (persisted.documentElement.dataset.siteTheme !== "light") {
+    fail("themeToggle: theme changes from another tab should apply immediately");
+  }
+}
+
+function validatePageContracts() {
+  const systemsFile = path.join(docsRoot, "systems-skills.html");
+  const systemsPage = parsedPages.get(path.resolve(systemsFile));
+  const quizSections = systemsPage.pageTags
+    .filter((tag) => tag.attrs.class?.split(/\s+/).includes("quiz"))
+    .map((tag) => tag.attrs["data-section"]);
+  if (quizSections.join(",") !== "db,os,dist,net,infra") {
+    fail(`docs/systems-skills.html: unexpected quiz section order: ${quizSections.join(",")}`);
+  }
+  for (const id of ["score-text", "score-note", "toggle-explain", "retry", "sh-play"]) {
+    if (!systemsPage.idSet.has(id)) fail(`docs/systems-skills.html: missing interactive control #${id}`);
+  }
+
+  const codingFile = path.join(docsRoot, "coding-questions.html");
+  const codingPage = parsedPages.get(path.resolve(codingFile));
+  const solutionButtons = codingPage.pageTags.filter((tag) =>
+    tag.name === "button" && tag.attrs.class?.split(/\s+/).includes("sol-btn"));
+  const solutions = codingPage.pageTags.filter((tag) =>
+    tag.attrs.class?.split(/\s+/).includes("solution"));
+  if (solutionButtons.length !== 12 || solutions.length !== solutionButtons.length) {
+    fail("docs/coding-questions.html: expected 12 solution buttons paired with 12 solutions");
+  }
+  if (!codingPage.idSet.has("toggle-all")) {
+    fail("docs/coding-questions.html: missing #toggle-all solution control");
+  }
+
+  const styleSources = [
+    fs.readFileSync(path.join(docsRoot, "styles.css"), "utf8"),
+    fs.readFileSync(path.join(docsRoot, "embedded-systems", "embedded.css"), "utf8"),
+    systemsPage.html,
+    codingPage.html,
+  ];
+  const lowContrastAccent = /\{[^{}]*background\s*:\s*var\(--accent\)[^{}]*color\s*:\s*#(?:fff|ffffff)\b[^{}]*\}/i;
+  if (styleSources.some((source) => lowContrastAccent.test(source))) {
+    fail("site styles: accent-filled controls must use the theme-aware --on-accent color");
+  }
+
+  const sharedStyles = styleSources[0];
+  for (const theme of ["light", "dark"]) {
+    const block = sharedStyles.match(
+      new RegExp(`:root\\[data-site-theme="${theme}"\\]\\s*\\{([^}]*)\\}`, "i"),
+    )?.[1] ?? "";
+    const accent = block.match(/--accent:\s*(#[0-9a-f]{6})/i)?.[1];
+    const foreground = block.match(/--on-accent:\s*(#[0-9a-f]{6})/i)?.[1];
+    if (!accent || !foreground || contrastRatio(accent, foreground) < 4.5) {
+      fail(`site styles: ${theme} accent-filled controls must meet 4.5:1 text contrast`);
+    }
+  }
+}
+
 try {
   validateQuizSet("mainQuiz", loadMainQuizzes(), ["db", "os", "dist", "net", "infra"], 20, true);
   validateQuizSet(
@@ -356,6 +512,8 @@ try {
     false,
   );
   validateProgressState();
+  validateThemeState();
+  validatePageContracts();
 } catch (error) {
   fail(`site data could not be validated: ${error.message}`);
 }

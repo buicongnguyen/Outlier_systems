@@ -6,6 +6,7 @@
   <meta name="description" content="Revision notes and practice questions for databases and storage, OS/concurrency/runtime, distributed systems, networking, and infrastructure.">
   <title>Systems Skills Revision and Question Practice</title>
   <link rel="stylesheet" href="styles.css">
+  <script src="theme-toggle.js"></script>
   <style>
     .sub { margin-top: 24px; }
     .term-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:12px; }
@@ -33,9 +34,9 @@
     .options button.correct { border-color:var(--accent-strong); background:var(--accent-soft); color:var(--accent-strong); font-weight:700; opacity:1; }
     .options button.incorrect { border-color:var(--warn); background:var(--warn-soft); color:var(--warn); font-weight:700; opacity:1; }
     .options button.selected { border-color:var(--accent); background:var(--accent-soft); }
-    .options button .step-badge { display:inline-flex; align-items:center; justify-content:center; min-width:22px; height:22px; margin-right:9px; border-radius:999px; background:var(--accent); color:#ffffff; font-size:12px; font-weight:700; flex:none; }
+    .options button .step-badge { display:inline-flex; align-items:center; justify-content:center; min-width:22px; height:22px; margin-right:9px; border-radius:999px; background:var(--accent); color:var(--on-accent); font-size:12px; font-weight:700; flex:none; }
     .options button.step-btn { display:flex; align-items:flex-start; }
-    .check-btn { margin-top:10px; min-height:36px; border:1px solid var(--accent); border-radius:6px; padding:6px 14px; background:var(--accent); color:#ffffff; font-weight:700; font-size:14px; cursor:pointer; }
+    .check-btn { margin-top:10px; min-height:36px; border:1px solid var(--accent); border-radius:6px; padding:6px 14px; background:var(--accent); color:var(--on-accent); font-weight:700; font-size:14px; cursor:pointer; }
     .check-btn:hover:enabled { background:var(--accent-strong); border-color:var(--accent-strong); }
     .check-btn:disabled { opacity:0.5; cursor:default; }
     .qtype-tag { display:inline-block; margin-left:8px; padding:2px 9px; border-radius:999px; background:var(--warn-soft); color:var(--warn); font-size:11px; font-weight:700; vertical-align:2px; white-space:nowrap; }
@@ -47,7 +48,7 @@
     .verdict { font-weight:700; }
     .verdict.good { color:var(--accent-strong); }
     .verdict.bad { color:var(--warn); }
-    .bar-btn { min-height:38px; border:1px solid var(--accent); border-radius:6px; padding:7px 14px; background:var(--accent); color:#ffffff; font-weight:700; font-size:14px; cursor:pointer; }
+    .bar-btn { min-height:38px; border:1px solid var(--accent); border-radius:6px; padding:7px 14px; background:var(--accent); color:var(--on-accent); font-weight:700; font-size:14px; cursor:pointer; }
     .bar-btn:hover { background:var(--accent-strong); border-color:var(--accent-strong); }
     .bar-btn.secondary { background:var(--panel); color:var(--text); border-color:var(--line); }
     .bar-btn.secondary:hover { border-color:var(--accent); color:var(--accent-strong); background:var(--accent-soft); }
@@ -57,7 +58,7 @@
     .quiz-card .snippet .blank { color:var(--warn); font-weight:700; }
     .anim-block { margin:16px 0 0; padding:14px 16px; background:var(--panel); border:1px solid var(--line); border-radius:8px; box-shadow:var(--shadow); }
     .anim-controls { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-bottom:12px; }
-    .abtn { min-height:34px; border:1px solid var(--accent); border-radius:6px; padding:5px 13px; background:var(--accent); color:#ffffff; font-weight:700; font-size:13px; cursor:pointer; }
+    .abtn { min-height:34px; border:1px solid var(--accent); border-radius:6px; padding:5px 13px; background:var(--accent); color:var(--on-accent); font-weight:700; font-size:13px; cursor:pointer; }
     .abtn.secondary { background:var(--panel); color:var(--text); border-color:var(--line); }
     .abtn.secondary:hover:enabled { border-color:var(--accent); color:var(--accent-strong); background:var(--accent-soft); }
     .abtn:disabled { opacity:0.45; cursor:default; }
@@ -409,7 +410,7 @@ state machines written for you         (offload CPU work to a pool)</pre>
       <div class="anim-block" id="sh-anim">
         <div class="anim-controls">
           <button class="abtn secondary" id="sh-back" type="button">&#9664; Back</button>
-          <button class="abtn" id="sh-play" type="button">&#9654; Play</button>
+          <button class="abtn" id="sh-play" type="button" aria-pressed="false">&#9654; Play</button>
           <button class="abtn secondary" id="sh-step" type="button">Step &#9654;</button>
           <button class="abtn secondary" id="sh-reset" type="button">&#8635; Reset</button>
           <span class="anim-step-no" id="sh-stepno"></span>
@@ -511,7 +512,8 @@ state machines written for you         (offload CPU work to a pool)</pre>
         function go(n) { if (n < 0 || n >= STEPS.length) return stop(); prev = cur; cur = n; render(); }
         function stop() {
           if (timer) { clearInterval(timer); timer = null; }
-          $("sh-play").innerHTML = "&#9654; Play";
+          $("sh-play").textContent = "▶ Play";
+          $("sh-play").setAttribute("aria-pressed", "false");
         }
         $("sh-step").addEventListener("click", () => { stop(); go(cur + 1); });
         $("sh-back").addEventListener("click", () => { stop(); go(cur - 1); });
@@ -519,8 +521,13 @@ state machines written for you         (offload CPU work to a pool)</pre>
         $("sh-play").addEventListener("click", () => {
           if (timer) return stop();
           if (cur === STEPS.length - 1) { prev = -1; cur = 0; render(); }
-          $("sh-play").innerHTML = "&#10074;&#10074; Pause";
-          timer = setInterval(() => { cur === STEPS.length - 1 ? stop() : go(cur + 1); }, 1700);
+          $("sh-play").textContent = "Ⅱ Pause";
+          $("sh-play").setAttribute("aria-pressed", "true");
+          timer = setInterval(() => {
+            if (cur === STEPS.length - 1) return stop();
+            go(cur + 1);
+            if (cur === STEPS.length - 1) stop();
+          }, 1700);
         });
         render();
       })();
@@ -851,19 +858,25 @@ failure modes to design for:
   </main>
 
   <footer>
-    <p>Last updated: 2026-07-25. Styles shared with the Isaac Sim study hub.</p>
+    <p>Last updated: 2026-07-26. Styles shared with the Isaac Sim study hub.</p>
   </footer>
 
 <script>
 // Lightweight SVG sequence-diagram renderer (theme-aware via CSS variables).
 (function () {
-  const esc = s => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const esc = s => String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 
   function seq(mountId, spec) {
     const laneW = spec.laneW || 300, margin = spec.margin || 100;
     const fs = spec.fs || 12, rowH = spec.rowH || 38, boxW = spec.boxW || 150, boxH = 30;
     const A = spec.actors, W = margin * 2 + laneW * (A.length - 1);
     const X = i => margin + i * laneW;
+    const arrowId = `${mountId}-arrow`;
+    const warningArrowId = `${mountId}-warning-arrow`;
     const lifeTop = 8 + boxH;
     let y = lifeTop + 28;
     const body = [];
@@ -880,15 +893,15 @@ failure modes to design for:
       } else {
         const x1 = X(s.f), x2 = X(s.t), tip = x2 > x1 ? x2 - 3 : x2 + 3;
         body.push(`<text x="${(x1 + x2) / 2}" y="${y - 6}" text-anchor="middle" class="sq-lab${s.warn ? " warn" : ""}" font-size="${fs}">${esc(s.l)}</text>`);
-        body.push(`<line x1="${x1}" y1="${y}" x2="${tip}" y2="${y}" class="${s.warn ? "sq-warnline" : "sq-msg"}${s.d ? " sq-dash" : ""}" marker-end="url(#${s.warn ? "sqarw-w" : "sqarw"})"/>`);
+        body.push(`<line x1="${x1}" y1="${y}" x2="${tip}" y2="${y}" class="${s.warn ? "sq-warnline" : "sq-msg"}${s.d ? " sq-dash" : ""}" marker-end="url(#${s.warn ? warningArrowId : arrowId})"/>`);
         y += rowH;
       }
     }
     const H = y + 6;
-    let out = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" role="img">` +
+    let out = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="${esc(`Sequence diagram: ${A.join(" to ")}`)}">` +
       `<defs>` +
-      `<marker id="sqarw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="sq-arrowhead"/></marker>` +
-      `<marker id="sqarw-w" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="sq-arrowhead-w"/></marker>` +
+      `<marker id="${arrowId}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="sq-arrowhead"/></marker>` +
+      `<marker id="${warningArrowId}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="sq-arrowhead-w"/></marker>` +
       `</defs>`;
     A.forEach((a, i) => {
       out += `<line x1="${X(i)}" y1="${lifeTop}" x2="${X(i)}" y2="${H - 4}" class="sq-life"/>` +
@@ -1062,6 +1075,7 @@ failure modes to design for:
 <script src="quiz-data.js"></script>
 <script>
 const state = {};
+let reviewMode = false;
 
 function el(tag, className, text) {
   const node = document.createElement(tag);
@@ -1093,7 +1107,9 @@ function updateScore() {
   const t = totals();
   document.getElementById("score-text").textContent = `Score: ${t.correct} / ${t.answered}`;
   document.getElementById("score-note").textContent =
-    t.answered === t.total
+    reviewMode && t.answered < t.total
+      ? `Review mode: ${t.total - t.answered} unanswered questions are unscored. Retry to start a new attempt.`
+      : t.answered === t.total
       ? `Done! ${t.correct} of ${t.total} correct (${Math.round(100 * t.correct / t.total)}%). Retry to reshuffle questions and options.`
       : `${t.total - t.answered} of ${t.total} questions remaining across 5 sections.`;
   for (const key of Object.keys(state)) {
@@ -1293,6 +1309,7 @@ function renderOrder(container, item, number, sectionKey) {
 }
 
 function renderAll() {
+  reviewMode = false;
   document.getElementById("main").classList.remove("show-all");
   toggleBtn.textContent = "Reveal all answers";
   toggleBtn.setAttribute("aria-pressed", "false");
@@ -1311,14 +1328,45 @@ function renderAll() {
 
 const toggleBtn = document.getElementById("toggle-explain");
 toggleBtn.addEventListener("click", () => {
-  const on = document.getElementById("main").classList.toggle("show-all");
+  const main = document.getElementById("main");
+  const revealing = !main.classList.contains("show-all");
+  const t = totals();
+  if (
+    revealing &&
+    !reviewMode &&
+    t.answered < t.total &&
+    !globalThis.confirm(
+      "Reveal every answer? This ends the current attempt, and unanswered questions will remain unscored until you retry.",
+    )
+  ) {
+    return;
+  }
+
+  const on = main.classList.toggle("show-all");
+  if (on && t.answered < t.total) {
+    reviewMode = true;
+    document.querySelectorAll(".quiz button").forEach((button) => {
+      button.disabled = true;
+    });
+    updateScore();
+  }
   toggleBtn.textContent = on ? "Hide revealed answers" : "Reveal all answers";
   toggleBtn.setAttribute("aria-pressed", String(on));
 });
 
-document.getElementById("retry").addEventListener("click", renderAll);
+document.getElementById("retry").addEventListener("click", () => {
+  const t = totals();
+  if (
+    !reviewMode &&
+    t.answered > 0 &&
+    t.answered < t.total &&
+    !globalThis.confirm("Retry now? Your current score and unanswered selections will be cleared.")
+  ) {
+    return;
+  }
+  renderAll();
+});
 renderAll();
 </script>
-<script src="theme-toggle.js"></script>
 </body>
 </html>

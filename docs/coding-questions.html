@@ -6,11 +6,12 @@
   <meta name="description" content="Twelve frequently asked coding interview questions with worked Python solutions: Blind 75 staples, Glassdoor-reported questions, and systems-flavored implementation problems.">
   <title>Coding Interview Questions and Answers</title>
   <link rel="stylesheet" href="styles.css">
+  <script src="theme-toggle.js"></script>
   <style>
     .sub { margin-top: 24px; }
     .toolbar { position:sticky; top:0; z-index:5; display:flex; flex-wrap:wrap; align-items:center; gap:12px; margin:18px 0; padding:12px 15px; background:var(--panel); border:1px solid var(--line); border-radius:8px; box-shadow:var(--shadow); }
     .toolbar .section-note { margin:0; flex:1 1 260px; }
-    .bar-btn { min-height:38px; border:1px solid var(--accent); border-radius:6px; padding:7px 14px; background:var(--accent); color:#ffffff; font-weight:700; font-size:14px; cursor:pointer; }
+    .bar-btn { min-height:38px; border:1px solid var(--accent); border-radius:6px; padding:7px 14px; background:var(--accent); color:var(--on-accent); font-weight:700; font-size:14px; cursor:pointer; }
     .bar-btn:hover { background:var(--accent-strong); border-color:var(--accent-strong); }
     .qcard { margin:14px 0; padding:16px 18px; background:var(--panel); border:1px solid var(--line); border-radius:8px; box-shadow:var(--shadow); }
     .qcard h3 { margin-bottom:4px; }
@@ -21,7 +22,7 @@
     .pill.topic { background:var(--bg); color:var(--muted); border:1px solid var(--line); }
     .src { margin:0 0 10px; font-size:13px; color:var(--muted); }
     .code { margin:10px 0 0; padding:12px 14px; overflow-x:auto; background:var(--bg); border:1px solid var(--line); border-radius:6px; font-family:Consolas,Menlo,monospace; font-size:13px; line-height:1.5; color:var(--text); }
-    .sol-btn { margin-top:12px; min-height:36px; border:1px solid var(--accent); border-radius:6px; padding:6px 14px; background:var(--accent); color:#ffffff; font-weight:700; font-size:14px; cursor:pointer; }
+    .sol-btn { margin-top:12px; min-height:36px; border:1px solid var(--accent); border-radius:6px; padding:6px 14px; background:var(--accent); color:var(--on-accent); font-weight:700; font-size:14px; cursor:pointer; }
     .sol-btn:hover { background:var(--accent-strong); border-color:var(--accent-strong); }
     .solution { display:none; margin-top:12px; padding-top:4px; border-top:1px dashed var(--line); }
     .solution.show { display:block; }
@@ -474,7 +475,7 @@ class HashRing:
   </main>
 
   <footer>
-    <p>Last updated: 2026-07-25. Styles shared with the Isaac Sim study hub.</p>
+    <p>Last updated: 2026-07-26. Styles shared with the Isaac Sim study hub.</p>
   </footer>
 
 <script>
@@ -517,6 +518,5 @@ allBtn.addEventListener("click", () => {
   syncAllButton();
 });
 </script>
-<script src="theme-toggle.js"></script>
 </body>
 </html>

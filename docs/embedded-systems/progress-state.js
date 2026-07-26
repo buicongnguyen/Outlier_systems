@@ -101,7 +101,13 @@
     try {
       const parsed = JSON.parse(stored);
       const state = emptyState();
-      if (!parsed || typeof parsed !== "object") {
+      if (
+        !parsed ||
+        typeof parsed !== "object" ||
+        parsed.version !== VERSION ||
+        !parsed.topics ||
+        typeof parsed.topics !== "object"
+      ) {
         memoryState = state;
         return structuredCloneSafe(memoryState);
       }

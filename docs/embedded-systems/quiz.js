@@ -478,7 +478,7 @@
     });
 
     globalThis.addEventListener("storage", (event) => {
-      if (event.key === progress.STORAGE_KEY) render();
+      if (event.key === progress.STORAGE_KEY || event.key === null) render();
     });
 
     render();
