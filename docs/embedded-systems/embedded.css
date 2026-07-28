@@ -817,6 +817,292 @@
   text-decoration: none;
 }
 
+/* Accessible, CSS-native teaching diagrams */
+.system-visual {
+  margin: 20px 0;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background:
+    linear-gradient(145deg, color-mix(in srgb, var(--accent-soft) 54%, transparent), transparent 46%),
+    var(--panel);
+  box-shadow: var(--shadow);
+}
+
+.visual-heading {
+  margin-bottom: 14px;
+}
+
+.visual-heading h3 {
+  margin-bottom: 0;
+  font-size: 18px;
+}
+
+.visual-kicker {
+  margin-bottom: 4px;
+  color: var(--accent-strong);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.system-visual figcaption {
+  margin-top: 13px;
+  padding-top: 11px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.visual-scroll {
+  overflow-x: auto;
+  padding: 2px 1px 8px;
+  overscroll-behavior-inline: contain;
+  scrollbar-color: var(--line) transparent;
+  scrollbar-width: thin;
+}
+
+.visual-scroll:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.flow-line {
+  display: flex;
+  min-width: 820px;
+  align-items: stretch;
+}
+
+.flow-line.wide {
+  min-width: 860px;
+}
+
+.flow-line.wide .flow-node {
+  min-width: 112px;
+  padding: 11px;
+}
+
+.flow-line.wide .flow-arrow {
+  width: 28px;
+  flex-basis: 28px;
+}
+
+.flow-node {
+  display: flex;
+  min-width: 132px;
+  flex: 1 1 0;
+  flex-direction: column;
+  justify-content: center;
+  padding: 13px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--bg);
+  text-align: center;
+}
+
+.flow-node strong {
+  display: block;
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.25;
+}
+
+.flow-node small {
+  display: block;
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.35;
+}
+
+.flow-node.security {
+  border-color: var(--warn);
+  background: var(--warn-soft);
+}
+
+.flow-node.host {
+  border-color: var(--blue);
+  background: var(--blue-soft);
+}
+
+.flow-node.npu {
+  border-color: var(--violet);
+  background: var(--violet-soft);
+}
+
+.flow-node.memory {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.flow-arrow {
+  display: grid;
+  width: 36px;
+  flex: 0 0 36px;
+  place-items: center;
+  color: var(--accent-strong);
+  font-size: 20px;
+  font-weight: 900;
+}
+
+.state-return {
+  display: grid;
+  min-width: 820px;
+  grid-template-columns: minmax(132px, 1fr) 36px minmax(132px, 1fr) 36px minmax(132px, 1fr);
+  gap: 0;
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 800;
+  text-align: center;
+}
+
+.state-return span {
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--bg) 78%, transparent);
+}
+
+.state-return .return-ready {
+  grid-column: 1 / 3;
+}
+
+.state-return .suspend-route {
+  grid-column: 3 / 6;
+}
+
+.trust-rails {
+  display: grid;
+  min-width: 820px;
+  grid-template-columns: 92px minmax(0, 1fr);
+  gap: 7px 10px;
+  margin-top: 10px;
+  align-items: center;
+}
+
+.trust-rail-label {
+  color: var(--text);
+  font-size: 10px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.trust-rail {
+  padding: 7px 10px;
+  border-radius: 7px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.trust-rail.verify {
+  border: 1px solid var(--warn);
+  background: var(--warn-soft);
+}
+
+.trust-rail.measure {
+  border: 1px dashed var(--accent);
+  background: var(--accent-soft);
+}
+
+.timeline-board,
+.message-sequence {
+  width: 100%;
+  min-width: 850px;
+  border-collapse: separate;
+  border-spacing: 6px;
+}
+
+.timeline-board th,
+.timeline-board td,
+.message-sequence th,
+.message-sequence td {
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--bg) 82%, transparent);
+  font-size: 10px;
+  line-height: 1.35;
+  text-align: center;
+  vertical-align: middle;
+}
+
+.timeline-board thead th,
+.message-sequence thead th {
+  background: color-mix(in srgb, var(--panel) 68%, var(--accent-soft));
+  color: var(--muted);
+  font-size: 9px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.timeline-board tbody th,
+.message-sequence tbody th {
+  background: var(--panel);
+  color: var(--text);
+  font-size: 11px;
+  text-align: left;
+}
+
+.lane-running {
+  border: 1px solid var(--accent) !important;
+  background: var(--accent-soft) !important;
+  color: var(--accent-strong);
+  font-weight: 800;
+}
+
+.lane-blocked {
+  border: 1px solid var(--warn) !important;
+  background: var(--warn-soft) !important;
+  color: var(--warn);
+  font-weight: 800;
+}
+
+.lane-boosted {
+  border: 1px solid var(--violet) !important;
+  background: var(--violet-soft) !important;
+  color: var(--violet);
+  font-weight: 800;
+}
+
+.lane-idle {
+  color: var(--muted);
+}
+
+.message-sequence td:nth-child(2) {
+  border-left: 3px solid var(--blue);
+}
+
+.message-sequence td:nth-child(3) {
+  background: color-mix(in srgb, var(--accent-soft) 68%, var(--panel));
+  color: var(--accent-strong);
+  font-weight: 800;
+}
+
+.message-sequence td:nth-child(4) {
+  border-right: 3px solid var(--violet);
+}
+
+.gate-list {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 5px;
+  margin-top: 8px;
+}
+
+.gate-chip {
+  display: inline-flex;
+  min-height: 23px;
+  align-items: center;
+  padding: 3px 7px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font-size: 9px;
+  font-weight: 900;
+}
+
 @media (max-width: 900px) {
   .topic-layout {
     grid-template-columns: 1fr;
@@ -850,6 +1136,12 @@
 @media (max-width: 560px) {
   .hero-panel {
     padding: 19px;
+  }
+
+  .system-visual {
+    margin-right: -4px;
+    margin-left: -4px;
+    padding: 15px 13px;
   }
 
   .step-flow {
@@ -886,5 +1178,34 @@
 
   .quiz-feedback {
     display: block;
+  }
+
+  .system-visual {
+    break-inside: avoid;
+    box-shadow: none;
+  }
+
+  .visual-scroll {
+    overflow: visible;
+  }
+
+  .flow-line,
+  .flow-line.wide,
+  .state-return,
+  .trust-rails,
+  .timeline-board,
+  .message-sequence {
+    min-width: 0;
+  }
+
+  .flow-line .flow-node {
+    min-width: 0;
+    padding: 7px;
+  }
+
+  .flow-line .flow-arrow {
+    width: 16px;
+    flex-basis: 16px;
+    font-size: 14px;
   }
 }

@@ -6,7 +6,7 @@
   <meta name="description" content="Host CPU and NPU startup: PCIe and SoC discovery, driver binding, clocks, resets, power, firmware loading, remote processor control and ABI handshake.">
   <title>Host CPU and NPU Startup</title>
   <link rel="stylesheet" href="../styles.css?v=book-2">
-  <link rel="stylesheet" href="embedded.css">
+  <link rel="stylesheet" href="embedded.css?v=visual-1">
   <script src="../theme-toggle.js"></script>
   <script src="../book-shell.js"></script>
 </head>
@@ -113,6 +113,27 @@
             <li><strong>Handshake</strong><span>Exchange magic, ABI version, capabilities, queue counts, address width and coherency flags.</span></li>
             <li><strong>Mark Ready</strong><span>Only now expose a usable accelerator context to the runtime.</span></li>
           </ol>
+          <figure class="system-visual" aria-labelledby="startup-sequence-visual-title">
+            <div class="visual-heading">
+              <p class="visual-kicker">Host ↔ NPU sequence</p>
+              <h3 id="startup-sequence-visual-title">Discovery is only the first boundary crossing</h3>
+            </div>
+            <div class="visual-scroll" tabindex="0" aria-label="Scrollable host and NPU startup sequence">
+              <table class="message-sequence">
+                <thead>
+                  <tr><th>Gate</th><th>Linux host / driver</th><th>Boundary evidence</th><th>NPU processor / firmware</th></tr>
+                </thead>
+                <tbody>
+                  <tr><th>1 · Own</th><td>Bind driver; acquire power, reset, MMIO, IRQ and DMA resources</td><td>Device matched; reset still asserted</td><td>Offline; no DMA or commands permitted</td></tr>
+                  <tr><th>2 · Load</th><td>Authenticate container and place firmware sections</td><td>Image digest, entry point and memory bounds accepted</td><td>Bootstrap memory contains a complete image</td></tr>
+                  <tr><th>3 · Start</th><td>Program boot state, unmask management path and release reset</td><td>Boot-status transition within a deadline →</td><td>Run early init, MMU/cache setup and RTOS startup</td></tr>
+                  <tr><th>4 · Negotiate</th><td>Wait for HELLO; validate magic, ABI and capabilities</td><td>← HELLO · ABI · address width · coherency</td><td>Publish firmware identity and supported transport contract</td></tr>
+                  <tr><th>5 · Ready</th><td>Create protected queues and expose a runtime context</td><td>Queue table + generation + IOMMU mappings →</td><td>Acknowledge Ready; begin accepting current-generation commands</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <figcaption>A successful bus match proves that software found the device. Runtime access is safe only after firmware boot, ABI negotiation and protected transport setup all succeed.</figcaption>
+          </figure>
           <div class="callout danger">
             <h3>Host trust does not automatically cover NPU firmware</h3>
             <p>

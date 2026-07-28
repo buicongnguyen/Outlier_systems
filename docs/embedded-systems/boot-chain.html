@@ -6,7 +6,7 @@
   <meta name="description" content="Boot ROM, secure and measured boot, staged bootloaders, UEFI, U-Boot, device tree, Linux kernel initialization, initramfs and PID 1.">
   <title>Boot ROM to Kernel Initialization</title>
   <link rel="stylesheet" href="../styles.css?v=book-2">
-  <link rel="stylesheet" href="embedded.css">
+  <link rel="stylesheet" href="embedded.css?v=visual-1">
   <script src="../theme-toggle.js"></script>
   <script src="../book-shell.js"></script>
 </head>
@@ -89,6 +89,30 @@
             <article class="concept-card"><h3>Revocation</h3><p>Compromised signers must be removable through authenticated revocation lists or key rotation without destroying the recovery path.</p></article>
             <article class="concept-card"><h3>A/B updates</h3><p>Write the inactive slot, authenticate it, try it with a bounded boot counter, then mark success from a healthy system. Fall back after repeated failures.</p></article>
           </div>
+          <figure class="system-visual" aria-labelledby="trust-chain-visual-title">
+            <div class="visual-heading">
+              <p class="visual-kicker">Trust propagation</p>
+              <h3 id="trust-chain-visual-title">Every stage authorizes the next handoff</h3>
+            </div>
+            <div class="visual-scroll" role="img" tabindex="0" aria-label="An immutable key or key hash anchors Boot ROM. Boot ROM authenticates the first loader, the loader authenticates platform firmware, platform firmware authenticates the kernel bundle, and the kernel can enforce a verified root filesystem policy. Verified boot blocks unauthorized execution while measured boot records accepted stages for attestation.">
+              <div class="flow-line wide">
+                <div class="flow-node security"><strong>Immutable anchor</strong><small>ROM code · fused key hash · lifecycle policy</small></div>
+                <div class="flow-arrow" aria-hidden="true">→</div>
+                <div class="flow-node security"><strong>Boot ROM</strong><small>Verify manifest, signature and security version</small></div>
+                <div class="flow-arrow" aria-hidden="true">→</div>
+                <div class="flow-node security"><strong>SPL / first loader</strong><small>Initialize DRAM; authenticate richer firmware</small></div>
+                <div class="flow-arrow" aria-hidden="true">→</div>
+                <div class="flow-node host"><strong>UEFI / U-Boot</strong><small>Verify kernel, DTB and initramfs policy</small></div>
+                <div class="flow-arrow" aria-hidden="true">→</div>
+                <div class="flow-node memory"><strong>Kernel + rootfs</strong><small>Optionally enforce verified storage before trusted userspace</small></div>
+              </div>
+              <div class="trust-rails" aria-hidden="true">
+                <span class="trust-rail-label">Verified</span><span class="trust-rail verify">Check before execution; reject, recover or fall back when authentication or anti-rollback policy fails.</span>
+                <span class="trust-rail-label">Measured</span><span class="trust-rail measure">Extend each accepted stage's digest into protected registers so a verifier can later reconstruct what ran.</span>
+              </div>
+            </div>
+            <figcaption>Verified boot is an enforcement path; measured boot is an evidence path. A production design often uses both, but they answer different questions.</figcaption>
+          </figure>
           <div class="callout danger">
             <h3>Authentication is not confidentiality</h3>
             <p>Secure Boot verifies origin and integrity. Encrypting firmware, protecting secret keys and preventing physical extraction require additional controls.</p>

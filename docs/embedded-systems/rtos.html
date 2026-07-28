@@ -6,7 +6,7 @@
   <meta name="description" content="RTOS concepts: deterministic scheduling, interrupts, priority inversion, timers, IPC, memory allocation, watchdogs, and coordination with Linux and NPU processors.">
   <title>RTOS Concepts and Scheduling</title>
   <link rel="stylesheet" href="../styles.css?v=book-2">
-  <link rel="stylesheet" href="embedded.css">
+  <link rel="stylesheet" href="embedded.css?v=visual-1">
   <script src="../theme-toggle.js"></script>
   <script src="../book-shell.js"></script>
 </head>
@@ -101,6 +101,26 @@
               </tbody>
             </table>
           </div>
+          <figure class="system-visual" aria-labelledby="task-state-visual-title">
+            <div class="visual-heading">
+              <p class="visual-kicker">State machine</p>
+              <h3 id="task-state-visual-title">How a task moves through the scheduler</h3>
+            </div>
+            <div class="visual-scroll" role="img" tabindex="0" aria-label="A Ready task is dispatched to Running. Running returns to Ready when preempted or yielding, moves to Blocked when waiting, and a Blocked task returns to Ready after its event or timeout. Suspension can remove a task until an explicit resume.">
+              <div class="flow-line">
+                <div class="flow-node memory"><strong>Ready</strong><small>Eligible; waiting for CPU time</small></div>
+                <div class="flow-arrow" aria-hidden="true">⇄</div>
+                <div class="flow-node host"><strong>Running</strong><small>Highest-priority Ready task on the CPU</small></div>
+                <div class="flow-arrow" aria-hidden="true">→</div>
+                <div class="flow-node security"><strong>Blocked</strong><small>Waiting for an event, IPC object or timeout</small></div>
+              </div>
+              <div class="state-return" aria-hidden="true">
+                <span class="return-ready">dispatch → · ← preempt or yield</span>
+                <span class="suspend-route">block or delay → · event or timeout returns to Ready · suspend/resume is explicit</span>
+              </div>
+            </div>
+            <figcaption>The scheduler selects only from Ready tasks. Interrupts and timers usually make work Ready; they do not make a blocked task run directly.</figcaption>
+          </figure>
           <ol class="sequence-rail">
             <li><strong>Sensor IRQ fires</strong><p>The processor saves minimal context and enters the interrupt handler.</p></li>
             <li><strong>ISR acknowledges and captures</strong><p>Clear the source, copy a small sample or descriptor, and avoid blocking APIs.</p></li>
@@ -130,12 +150,30 @@
         <section class="section" aria-labelledby="inversion">
           <h2 id="inversion">4. Priority inversion and bounded sharing</h2>
           <p class="section-lead">The classic failure requires three priorities and one shared lock.</p>
+          <figure class="system-visual" aria-labelledby="inversion-visual-title">
+            <div class="visual-heading">
+              <p class="visual-kicker">Two scheduling outcomes</p>
+              <h3 id="inversion-visual-title">Priority inheritance closes the indirect blocking path</h3>
+            </div>
+            <div class="visual-scroll" tabindex="0" aria-label="Scrollable comparison of priority inversion with and without inheritance">
+              <table class="timeline-board">
+                <thead>
+                  <tr><th>Policy</th><th>1 · Low locks</th><th>2 · High requests</th><th>3 · Medium becomes Ready</th><th>4 · Outcome</th></tr>
+                </thead>
+                <tbody>
+                  <tr><th>No inheritance</th><td class="lane-running">Low runs inside the critical section</td><td class="lane-blocked">High blocks; Low remains low priority</td><td class="lane-running">Medium preempts Low</td><td class="lane-blocked">High's wait now depends on unrelated Medium work</td></tr>
+                  <tr><th>With inheritance</th><td class="lane-running">Low runs inside the critical section</td><td class="lane-boosted">High blocks; Low immediately inherits High's priority</td><td class="lane-idle">Medium cannot preempt boosted Low</td><td class="lane-running">Low releases; High runs; Low returns to base priority</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <figcaption>Inheritance is applied when High blocks, before Medium gets a chance to preempt the lock owner. That bounds High's wait by Low's protected critical section plus scheduler overhead.</figcaption>
+          </figure>
           <ol class="sequence-rail">
             <li><strong>Low takes a mutex</strong><p>A low-priority task begins a short critical section protecting a shared device.</p></li>
             <li><strong>High blocks on the mutex</strong><p>The most urgent task cannot proceed even though Low owns the needed resource.</p></li>
-            <li><strong>Medium preempts Low</strong><p>Unrelated medium-priority work can run indefinitely, indirectly blocking High.</p></li>
-            <li><strong>Priority inheritance raises Low</strong><p>Low temporarily executes at High's priority, completes the critical section and releases the mutex.</p></li>
-            <li><strong>High runs; Low returns to base priority</strong><p>The inversion becomes bounded by the protected critical section rather than Medium's workload.</p></li>
+            <li><strong>Without inheritance, Medium can preempt Low</strong><p>Unrelated medium-priority work delays the lock owner and therefore indirectly delays High.</p></li>
+            <li><strong>With inheritance, the block immediately raises Low</strong><p>As soon as High waits on the mutex, Low temporarily executes at High's priority, so Medium cannot preempt the critical section.</p></li>
+            <li><strong>Low releases; High runs</strong><p>Low returns to its base priority and the inversion is bounded by the protected critical section rather than Medium's workload.</p></li>
           </ol>
           <div class="callout danger">
             <h3>Inheritance is damage control, not permission for large critical sections</h3>

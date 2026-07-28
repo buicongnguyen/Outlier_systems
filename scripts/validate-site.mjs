@@ -53,6 +53,14 @@ function resolveLocalReference(page, value) {
 
 const htmlFiles = walk(docsRoot, ".html");
 const parsedPages = new Map();
+const expectedVisualsByPage = new Map([
+  ["docs/embedded-systems/index.html", 0],
+  ["docs/embedded-systems/rtos.html", 2],
+  ["docs/embedded-systems/boot-chain.html", 1],
+  ["docs/embedded-systems/host-npu-startup.html", 1],
+  ["docs/embedded-systems/npu-data-path.html", 2],
+  ["docs/embedded-systems/end-to-end.html", 1],
+]);
 
 for (const file of htmlFiles) {
   const html = fs.readFileSync(file, "utf8");
@@ -125,6 +133,41 @@ for (const file of htmlFiles) {
 
   const pageName = relative(file);
   if (pageName.startsWith("docs/embedded-systems/")) {
+    const embeddedStylesheets = pageTags.filter((tag) =>
+      tag.name === "link" &&
+      tag.attrs.rel === "stylesheet" &&
+      stripQuery(tag.attrs.href ?? "").endsWith("embedded.css"));
+    if (embeddedStylesheets.length !== 1) {
+      fail(`${pageName}: expected exactly one embedded.css link`);
+    } else if (!embeddedStylesheets[0].attrs.href.endsWith("?v=visual-1")) {
+      fail(`${pageName}: embedded.css must use the current visual cache version`);
+    }
+
+    const visuals = pageTags.filter((tag) =>
+      tag.name === "figure" && tag.attrs.class?.split(/\s+/).includes("system-visual"));
+    const expectedVisuals = expectedVisualsByPage.get(pageName);
+    if (visuals.length !== expectedVisuals) {
+      fail(`${pageName}: expected ${expectedVisuals} teaching visual(s), found ${visuals.length}`);
+    }
+    const captions = pageTags.filter((tag) => tag.name === "figcaption");
+    if (captions.length !== visuals.length) {
+      fail(`${pageName}: every teaching visual must have one figcaption`);
+    }
+    const scrollableVisuals = pageTags.filter((tag) =>
+      tag.attrs.class?.split(/\s+/).includes("visual-scroll"));
+    if (
+      scrollableVisuals.length !== visuals.length ||
+      scrollableVisuals.some((tag) => tag.attrs.tabindex !== "0" || !tag.attrs["aria-label"])
+    ) {
+      fail(`${pageName}: every scrollable teaching visual must be keyboard-focusable and labelled`);
+    }
+    for (const visual of visuals) {
+      const titleId = visual.attrs["aria-labelledby"];
+      if (!titleId || !idSet.has(titleId)) {
+        fail(`${pageName}: teaching visual has a missing aria-labelledby target`);
+      }
+    }
+
     const scriptSources = pageTags
       .filter((tag) => tag.name === "script" && tag.attrs.src)
       .map((tag) => tag.attrs.src);
@@ -559,6 +602,21 @@ function validateBookShell() {
   }
 }
 
+function validateTeachingVisuals() {
+  const styles = fs.readFileSync(path.join(docsRoot, "embedded-systems", "embedded.css"), "utf8");
+  for (const contract of [
+    ".system-visual",
+    ".visual-scroll",
+    ".flow-line",
+    ".timeline-board",
+    ".message-sequence",
+  ]) {
+    if (!styles.includes(contract)) fail(`teachingVisuals: missing style contract ${contract}`);
+  }
+  const total = [...expectedVisualsByPage.values()].reduce((sum, count) => sum + count, 0);
+  if (total !== 7) fail(`teachingVisuals: expected seven planned visuals, found ${total}`);
+}
+
 try {
   validateQuizSet("mainQuiz", loadMainQuizzes(), ["db", "os", "dist", "net", "infra"], 20, true);
   validateQuizSet(
@@ -572,6 +630,7 @@ try {
   validateThemeState();
   validatePageContracts();
   validateBookShell();
+  validateTeachingVisuals();
 } catch (error) {
   fail(`site data could not be validated: ${error.message}`);
 }
@@ -584,6 +643,6 @@ if (failures.length) {
   console.log(
     `Site validation passed: ${htmlFiles.length} HTML pages, ` +
     `${walk(docsRoot, ".js").length} JavaScript files, 125 quiz questions, ` +
-    "persistent progress transitions, and book navigation contracts.",
+    "seven teaching visuals, persistent progress transitions, and book navigation contracts.",
   );
 }

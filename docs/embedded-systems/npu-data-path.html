@@ -6,7 +6,7 @@
   <meta name="description" content="NPU driver and data path: PCIe and SoC resources, BAR and MMIO mapping, DMA, IOMMU isolation, command queues, doorbells, interrupts, completions and recovery.">
   <title>NPU Driver, DMA, IOMMU and Interrupts</title>
   <link rel="stylesheet" href="../styles.css?v=book-2">
-  <link rel="stylesheet" href="embedded.css">
+  <link rel="stylesheet" href="embedded.css?v=visual-1">
   <script src="../theme-toggle.js"></script>
   <script src="../book-shell.js"></script>
 </head>
@@ -111,6 +111,28 @@
             <li><strong>DMA / IOVA</strong><span>The address programmed into the NPU descriptor or page table.</span></li>
             <li><strong>IOMMU translation</strong><span>Maps the device-visible address to permitted physical pages with access permissions.</span></li>
           </ol>
+          <figure class="system-visual" aria-labelledby="dma-translation-visual-title">
+            <div class="visual-heading">
+              <p class="visual-kicker">Address translation</p>
+              <h3 id="dma-translation-visual-title">The NPU never dereferences a userspace pointer</h3>
+            </div>
+            <div class="visual-scroll" role="img" tabindex="0" aria-label="Userspace supplies a CPU virtual buffer. The kernel pins or imports its backing pages. The DMA API maps those pages and returns an IOVA. The driver places that IOVA in a validated descriptor. The NPU issues the IOVA, and the IOMMU permits translation only to mapped physical pages.">
+              <div class="flow-line wide">
+                <div class="flow-node host"><strong>CPU virtual buffer</strong><small>Process address; valid only in its CPU page-table context</small></div>
+                <div class="flow-arrow" aria-hidden="true">→</div>
+                <div class="flow-node memory"><strong>Pinned / imported pages</strong><small>Kernel owns lifetime and scatter-gather backing</small></div>
+                <div class="flow-arrow" aria-hidden="true">→</div>
+                <div class="flow-node host"><strong>DMA mapping</strong><small>Direction, permissions, coherency and lifetime produce an IOVA</small></div>
+                <div class="flow-arrow" aria-hidden="true">→</div>
+                <div class="flow-node security"><strong>Validated descriptor</strong><small>Contains device-visible IOVA, length and generation—not a CPU pointer</small></div>
+                <div class="flow-arrow" aria-hidden="true">→</div>
+                <div class="flow-node npu"><strong>NPU transaction</strong><small>Device issues reads or writes using the IOVA</small></div>
+                <div class="flow-arrow" aria-hidden="true">→</div>
+                <div class="flow-node memory"><strong>IOMMU → DRAM</strong><small>Translate only to permitted physical pages; fault otherwise</small></div>
+              </div>
+            </div>
+            <figcaption>The DMA API creates the device-visible contract. Mapping lifetime must outlive every possible NPU access, including cancellation and recovery.</figcaption>
+          </figure>
           <div class="table-wrap">
             <table class="compare-table">
               <thead><tr><th>Mapping type</th><th>Typical use</th><th>Key rule</th></tr></thead>
@@ -168,6 +190,28 @@ host completion:
   dma_rmb()                     // producer observed before status reads
   drain completion records up to completed
   publish completion_consumer</pre>
+          <figure class="system-visual" aria-labelledby="queue-roundtrip-visual-title">
+            <div class="visual-heading">
+              <p class="visual-kicker">Command round trip</p>
+              <h3 id="queue-roundtrip-visual-title">Two ordered publications make one inference command trustworthy</h3>
+            </div>
+            <div class="visual-scroll" role="img" tabindex="0" aria-label="The runtime submits a command. The driver validates handles and reserves a queue slot. It publishes the complete descriptor before updating the producer and ringing the doorbell. NPU firmware validates and executes the command. Firmware publishes completion data before raising an interrupt. The driver drains completions and signals the userspace fence.">
+              <div class="flow-line wide">
+                <div class="flow-node host"><strong>1 · Runtime submit</strong><small>Context, model, buffers and fence</small></div>
+                <div class="flow-arrow" aria-hidden="true">→</div>
+                <div class="flow-node security"><strong>2 · Driver validate</strong><small>Bounds, ownership, mappings, generation and free slot</small></div>
+                <div class="flow-arrow" aria-hidden="true">→</div>
+                <div class="flow-node memory"><strong>3 · Publish command</strong><small>Descriptor → barrier → producer → doorbell</small></div>
+                <div class="flow-arrow" aria-hidden="true">→</div>
+                <div class="flow-node npu"><strong>4 · NPU execute</strong><small>Consume current-generation work and run engines</small></div>
+                <div class="flow-arrow" aria-hidden="true">→</div>
+                <div class="flow-node memory"><strong>5 · Publish completion</strong><small>Status → barrier → completion producer → IRQ</small></div>
+                <div class="flow-arrow" aria-hidden="true">→</div>
+                <div class="flow-node host"><strong>6 · Signal client</strong><small>Drain record, release mappings and complete fence</small></div>
+              </div>
+            </div>
+            <figcaption>The command descriptor must be visible before the doorbell, and the completion record must be visible before software treats the interrupt as proof of completion.</figcaption>
+          </figure>
           <div class="outcomes">
             <article class="outcome"><strong>Producer owns free slots</strong><p>It must never overrun the consumer. Track wrap with monotonic counters or an explicit phase bit.</p></article>
             <article class="outcome"><strong>Consumer owns published slots</strong><p>It reads a descriptor only after observing the ordered producer update.</p></article>

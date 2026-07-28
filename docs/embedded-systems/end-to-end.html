@@ -6,7 +6,7 @@
   <meta name="description" content="End-to-end host and NPU system walkthrough from Boot ROM and secure boot through Linux, NPU firmware, DMA/IOMMU, runtime, model loading and first inference.">
   <title>Host + NPU: Cold Boot to First Inference</title>
   <link rel="stylesheet" href="../styles.css?v=book-2">
-  <link rel="stylesheet" href="embedded.css">
+  <link rel="stylesheet" href="embedded.css?v=visual-1">
   <script src="../theme-toggle.js"></script>
   <script src="../book-shell.js"></script>
 </head>
@@ -95,6 +95,36 @@
 
         <section class="section" aria-labelledby="overview">
           <h2 id="overview">The complete sequence</h2>
+          <figure class="system-visual" aria-labelledby="gate-map-visual-title">
+            <div class="visual-heading">
+              <p class="visual-kicker">Dependency map</p>
+              <h3 id="gate-map-visual-title">Eleven gates form four ownership phases</h3>
+            </div>
+            <div class="visual-scroll" role="img" tabindex="0" aria-label="The system crosses four ordered phases. Trust foundation contains gates 1 to 3: Boot ROM, secure loaders and U-Boot. Host bring-up contains gates 4 to 6: Linux, NPU discovery and driver ownership. NPU bring-up contains gates 7 and 8: NPU firmware plus DMA, IOMMU and queues. Workload execution contains gates 9 to 11: runtime context, model loading and first inference.">
+              <div class="flow-line">
+                <div class="flow-node security">
+                  <strong>Trust foundation</strong><small>Only authorized host software reaches the OS handoff.</small>
+                  <span class="gate-list"><span class="gate-chip">1 ROM</span><span class="gate-chip">2 Loaders</span><span class="gate-chip">3 U-Boot</span></span>
+                </div>
+                <div class="flow-arrow" aria-hidden="true">→</div>
+                <div class="flow-node host">
+                  <strong>Host bring-up</strong><small>Linux discovers resources and the driver takes lifecycle ownership.</small>
+                  <span class="gate-list"><span class="gate-chip">4 Linux</span><span class="gate-chip">5 Discover</span><span class="gate-chip">6 Driver</span></span>
+                </div>
+                <div class="flow-arrow" aria-hidden="true">→</div>
+                <div class="flow-node npu">
+                  <strong>NPU bring-up</strong><small>Trusted firmware starts and a protected transport becomes Ready.</small>
+                  <span class="gate-list"><span class="gate-chip">7 Firmware</span><span class="gate-chip">8 DMA + queues</span></span>
+                </div>
+                <div class="flow-arrow" aria-hidden="true">→</div>
+                <div class="flow-node memory">
+                  <strong>Workload execution</strong><small>Userspace creates an isolated context, loads the model and proves completion.</small>
+                  <span class="gate-list"><span class="gate-chip">9 Runtime</span><span class="gate-chip">10 Model</span><span class="gate-chip">11 Inference</span></span>
+                </div>
+              </div>
+            </div>
+            <figcaption>Each phase changes the owner of the next invariant: immutable firmware → Linux → NPU firmware → userspace runtime. Later phases must never bypass an incomplete earlier gate.</figcaption>
+          </figure>
           <ol class="step-flow">
             <li><strong>Boot ROM</strong><span>Authenticate SPL from the selected boot slot.</span></li>
             <li><strong>Secure boot</strong><span>Extend trust and enforce version/recovery policy.</span></li>
