@@ -803,7 +803,19 @@ body.book-ready .learning-tree {
 }
 
 body.book-ready .breadcrumb {
+  align-items: center;
+  justify-content: flex-start;
+  gap: 6px;
   margin-bottom: 16px;
+  font-size: 12px;
+}
+
+body.book-ready .breadcrumb a {
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font-weight: 700;
 }
 
 .book-page-heading {
