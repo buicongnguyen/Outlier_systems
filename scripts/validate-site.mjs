@@ -96,6 +96,22 @@ for (const file of htmlFiles) {
   if (!/<script\b[^>]*\bsrc=["'][^"']*theme-toggle\.js["'][^>]*><\/script>/i.test(headSource)) {
     fail(`${relative(file)}: theme-toggle.js must load in <head> to prevent a saved-theme flash`);
   }
+  const bookScripts = pageTags.filter((tag) =>
+    tag.name === "script" && tag.attrs.src && tag.attrs.src.endsWith("book-shell.js"));
+  if (bookScripts.length !== 1) {
+    fail(`${relative(file)}: expected exactly one book-shell.js script, found ${bookScripts.length}`);
+  }
+  if (!/<script\b[^>]*\bsrc=["'][^"']*book-shell\.js["'][^>]*><\/script>/i.test(headSource)) {
+    fail(`${relative(file)}: book-shell.js must load in <head>`);
+  }
+  if (headSource.indexOf("theme-toggle.js") > headSource.indexOf("book-shell.js")) {
+    fail(`${relative(file)}: theme-toggle.js must load before book-shell.js`);
+  }
+  const progressScripts = pageTags.filter((tag) =>
+    tag.name === "script" && tag.attrs.src && tag.attrs.src.endsWith("progress-state.js"));
+  if (progressScripts.length !== 1) {
+    fail(`${relative(file)}: expected exactly one progress-state.js script, found ${progressScripts.length}`);
+  }
 
   const pageName = relative(file);
   if (pageName.startsWith("docs/embedded-systems/")) {
@@ -502,6 +518,37 @@ function validatePageContracts() {
   }
 }
 
+function validateBookShell() {
+  const source = fs.readFileSync(path.join(docsRoot, "book-shell.js"), "utf8");
+  const linkedPages = [...source.matchAll(/\bhref:\s*"([^"]+\.html)"/g)].map((match) => match[1]);
+  if (linkedPages.length !== 9 || new Set(linkedPages).size !== linkedPages.length) {
+    fail(`bookShell: expected nine unique chapter pages, found ${linkedPages.length}`);
+  }
+  for (const href of linkedPages) {
+    const target = path.resolve(docsRoot, href);
+    if (!fs.existsSync(target)) fail(`bookShell: missing chapter target ${href}`);
+  }
+
+  const styles = fs.readFileSync(path.join(docsRoot, "styles.css"), "utf8");
+  for (const contract of [
+    "--book-header-height: 64px",
+    "--book-sidebar-width: 280px",
+    "flex-direction: row",
+    ".book-reading-progress",
+    ".book-section-link.active",
+    "body.book-sidebar-open .book-sidebar",
+  ]) {
+    if (!styles.includes(contract)) fail(`bookShell: missing style contract ${contract}`);
+  }
+  for (const contract of [
+    'sidebar.toggleAttribute("inert", !open)',
+    'sidebar.setAttribute("aria-hidden", String(!open))',
+    'menu.setAttribute("aria-expanded", String(open))',
+  ]) {
+    if (!source.includes(contract)) fail(`bookShell: missing accessibility contract ${contract}`);
+  }
+}
+
 try {
   validateQuizSet("mainQuiz", loadMainQuizzes(), ["db", "os", "dist", "net", "infra"], 20, true);
   validateQuizSet(
@@ -514,6 +561,7 @@ try {
   validateProgressState();
   validateThemeState();
   validatePageContracts();
+  validateBookShell();
 } catch (error) {
   fail(`site data could not be validated: ${error.message}`);
 }
@@ -526,6 +574,6 @@ if (failures.length) {
   console.log(
     `Site validation passed: ${htmlFiles.length} HTML pages, ` +
     `${walk(docsRoot, ".js").length} JavaScript files, 125 quiz questions, ` +
-    "and persistent progress transitions.",
+    "persistent progress transitions, and book navigation contracts.",
   );
 }
