@@ -75,6 +75,16 @@ for (const file of htmlFiles) {
     tag.name === "a" && tag.attrs.class?.split(/\s+/).includes("skip-link") && tag.attrs.href === "#main");
   if (skipLinks.length !== 1) fail(`${relative(file)}: expected one skip link to #main`);
 
+  const sharedStylesheets = pageTags.filter((tag) =>
+    tag.name === "link" &&
+    tag.attrs.rel === "stylesheet" &&
+    stripQuery(tag.attrs.href ?? "").endsWith("styles.css"));
+  if (sharedStylesheets.length !== 1) {
+    fail(`${relative(file)}: expected exactly one shared styles.css link`);
+  } else if (!sharedStylesheets[0].attrs.href.endsWith("?v=book-2")) {
+    fail(`${relative(file)}: shared styles.css must use the current cache version`);
+  }
+
   const duplicateIds = ids.filter((id, index) => ids.indexOf(id) !== index);
   if (duplicateIds.length) fail(`${relative(file)}: duplicate IDs: ${[...new Set(duplicateIds)].join(", ")}`);
 
