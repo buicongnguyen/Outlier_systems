@@ -1103,6 +1103,115 @@
   font-weight: 900;
 }
 
+.dependency-map,
+.lifecycle-routes {
+  min-width: 820px;
+}
+
+.dependency-sources {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(120px, 1fr));
+  gap: 8px;
+}
+
+.dependency-source {
+  display: grid;
+  min-height: 64px;
+  place-items: center;
+  padding: 9px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1.35;
+  text-align: center;
+}
+
+.dependency-join {
+  padding: 7px;
+  color: var(--accent-strong);
+  font-size: 11px;
+  font-weight: 900;
+  text-align: center;
+}
+
+.dependency-hub {
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 13px 16px;
+  border: 2px solid var(--accent);
+  border-radius: 10px;
+  background: var(--accent-soft);
+  text-align: center;
+}
+
+.dependency-hub strong {
+  display: block;
+  font-size: 13px;
+}
+
+.dependency-hub small {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.dependency-outcomes {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(180px, 1fr));
+  gap: 8px;
+}
+
+.dependency-outcome {
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.35;
+  text-align: center;
+}
+
+.dependency-outcome strong {
+  display: block;
+  margin-bottom: 3px;
+  color: var(--text);
+  font-size: 11px;
+}
+
+.lifecycle-routes {
+  display: grid;
+  gap: 7px;
+  margin-top: 10px;
+}
+
+.lifecycle-route {
+  display: grid;
+  grid-template-columns: 94px minmax(0, 1fr);
+  gap: 9px;
+  align-items: center;
+}
+
+.lifecycle-route strong {
+  color: var(--text);
+  font-size: 10px;
+  text-transform: uppercase;
+}
+
+.lifecycle-route span {
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--bg) 82%, transparent);
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+}
+
 @media (max-width: 900px) {
   .topic-layout {
     grid-template-columns: 1fr;
@@ -1195,6 +1304,11 @@
   .trust-rails,
   .timeline-board,
   .message-sequence {
+    min-width: 0;
+  }
+
+  .dependency-map,
+  .lifecycle-routes {
     min-width: 0;
   }
 

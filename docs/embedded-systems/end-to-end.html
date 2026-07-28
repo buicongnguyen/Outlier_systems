@@ -6,7 +6,7 @@
   <meta name="description" content="End-to-end host and NPU system walkthrough from Boot ROM and secure boot through Linux, NPU firmware, DMA/IOMMU, runtime, model loading and first inference.">
   <title>Host + NPU: Cold Boot to First Inference</title>
   <link rel="stylesheet" href="../styles.css?v=book-2">
-  <link rel="stylesheet" href="embedded.css?v=visual-1">
+  <link rel="stylesheet" href="embedded.css?v=visual-2">
   <script src="../theme-toggle.js"></script>
   <script src="../book-shell.js"></script>
 </head>
@@ -238,6 +238,27 @@
             <li><strong>Host finalizes</strong><p>The driver drains completions, signals the fence, releases temporary mappings and reports timing/errors to the runtime.</p></li>
             <li><strong>Application validates output</strong><p>Check status, tensor metadata and an application-level plausibility/quality condition before consuming the result.</p></li>
           </ol>
+          <figure class="system-visual" aria-labelledby="first-inference-visual-title">
+            <div class="visual-heading">
+              <p class="visual-kicker">Ownership sequence</p>
+              <h3 id="first-inference-visual-title">A buffer changes owner at every synchronization boundary</h3>
+            </div>
+            <div class="visual-scroll" tabindex="0" aria-label="Scrollable first-inference sequence across runtime, kernel and NPU">
+              <table class="message-sequence">
+                <thead>
+                  <tr><th>Gate</th><th>Application / runtime</th><th>Kernel + shared memory</th><th>NPU firmware / engines</th></tr>
+                </thead>
+                <tbody>
+                  <tr><th>1 · Input ready</th><td>Wait for camera or producer fence</td><td>Import buffer; map permitted pages; transfer ownership</td><td>Cannot access input before the fence and mapping are valid</td></tr>
+                  <tr><th>2 · Submit</th><td>Reference current model, input/output handles and deadline class</td><td>Validate generation and bounds; publish descriptor; ring doorbell →</td><td>Observe producer, then read the ordered descriptor</td></tr>
+                  <tr><th>3 · Execute</th><td>Wait on completion fence without touching device-owned output</td><td>Mappings and queue slot remain live</td><td>Schedule DMA/tensor engines and write output</td></tr>
+                  <tr><th>4 · Complete</th><td>Still waiting</td><td>← Completion record and IRQ; drain status; signal fence</td><td>Publish status/output visibility before advancing completion</td></tr>
+                  <tr><th>5 · Consume</th><td>Fence signals; validate status, shape and plausibility</td><td>Release temporary mappings and account timing/errors</td><td>Queue slot is reusable; output ownership has returned</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <figcaption>The application must not read output while the NPU owns it, and the kernel must not release mappings until ordered completion proves the device has stopped accessing them.</figcaption>
+          </figure>
         </section>
 
         <section class="section" aria-labelledby="observability">

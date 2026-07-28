@@ -6,7 +6,7 @@
   <meta name="description" content="Boot ROM, secure and measured boot, staged bootloaders, UEFI, U-Boot, device tree, Linux kernel initialization, initramfs and PID 1.">
   <title>Boot ROM to Kernel Initialization</title>
   <link rel="stylesheet" href="../styles.css?v=book-2">
-  <link rel="stylesheet" href="embedded.css?v=visual-1">
+  <link rel="stylesheet" href="embedded.css?v=visual-2">
   <script src="../theme-toggle.js"></script>
   <script src="../book-shell.js"></script>
 </head>
@@ -164,6 +164,32 @@
             <article class="concept-card"><h3><code>iommus</code></h3><p>Associates the device with an IOMMU and stream identifier used to isolate DMA transactions.</p></article>
             <article class="concept-card"><h3><code>reserved-memory</code></h3><p>Excludes firmware/shared regions from normal allocation; consumers reference the regions with <code>memory-region</code>.</p></article>
           </div>
+          <figure class="system-visual" aria-labelledby="dt-dependency-visual-title">
+            <div class="visual-heading">
+              <p class="visual-kicker">Dependency graph</p>
+              <h3 id="dt-dependency-visual-title">An NPU node connects several kernel resource providers</h3>
+            </div>
+            <div class="visual-scroll" role="img" tabindex="0" aria-label="The parent bus defines address and size cell rules and may translate child addresses through ranges. The interrupt controller supplies interrupt routing. Clock and reset controllers supply sequencing. The SMMU supplies the IOMMU stream. Reserved memory supplies firmware and shared regions. Device tree references join those providers in the NPU node. The kernel creates a platform device, compatible strings select a driver, and probe either acquires every ready dependency or defers until a provider becomes available.">
+              <div class="dependency-map">
+                <div class="dependency-sources">
+                  <div class="dependency-source">Parent bus<br>address/size cells + ranges</div>
+                  <div class="dependency-source">Interrupt controller<br><code>interrupts</code></div>
+                  <div class="dependency-source">Clock + reset providers<br><code>clocks</code> · <code>resets</code></div>
+                  <div class="dependency-source">SMMU / IOMMU<br><code>iommus</code></div>
+                  <div class="dependency-source">Reserved memory<br><code>memory-region</code></div>
+                </div>
+                <div class="dependency-join" aria-hidden="true">references converge ↓</div>
+                <div class="dependency-hub"><strong><code>npu@4a000000</code></strong><small><code>compatible</code> identifies the programming model; properties describe resources and provider links.</small></div>
+                <div class="dependency-join" aria-hidden="true">kernel interpretation ↓</div>
+                <div class="dependency-outcomes">
+                  <div class="dependency-outcome"><strong>Create device</strong>Platform bus instantiates a firmware-described device.</div>
+                  <div class="dependency-outcome"><strong>Match driver</strong>OF match table selects a compatible implementation.</div>
+                  <div class="dependency-outcome"><strong>Probe or defer</strong>Acquire providers now, or retry after an unavailable dependency becomes ready.</div>
+                </div>
+              </div>
+            </div>
+            <figcaption>Device tree is dependency wiring, not executable setup code. Kernel frameworks resolve the references and enforce provider-specific sequencing.</figcaption>
+          </figure>
           <div class="callout warning">
             <h3>This node is illustrative, not a binding</h3>
             <p>Real property names, cell encodings and required resources come from the device's reviewed binding and SoC integration documentation.</p>

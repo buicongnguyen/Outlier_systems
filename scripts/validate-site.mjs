@@ -55,11 +55,11 @@ const htmlFiles = walk(docsRoot, ".html");
 const parsedPages = new Map();
 const expectedVisualsByPage = new Map([
   ["docs/embedded-systems/index.html", 0],
-  ["docs/embedded-systems/rtos.html", 2],
-  ["docs/embedded-systems/boot-chain.html", 1],
-  ["docs/embedded-systems/host-npu-startup.html", 1],
+  ["docs/embedded-systems/rtos.html", 3],
+  ["docs/embedded-systems/boot-chain.html", 2],
+  ["docs/embedded-systems/host-npu-startup.html", 2],
   ["docs/embedded-systems/npu-data-path.html", 2],
-  ["docs/embedded-systems/end-to-end.html", 1],
+  ["docs/embedded-systems/end-to-end.html", 2],
 ]);
 
 for (const file of htmlFiles) {
@@ -139,7 +139,7 @@ for (const file of htmlFiles) {
       stripQuery(tag.attrs.href ?? "").endsWith("embedded.css"));
     if (embeddedStylesheets.length !== 1) {
       fail(`${pageName}: expected exactly one embedded.css link`);
-    } else if (!embeddedStylesheets[0].attrs.href.endsWith("?v=visual-1")) {
+    } else if (!embeddedStylesheets[0].attrs.href.endsWith("?v=visual-2")) {
       fail(`${pageName}: embedded.css must use the current visual cache version`);
     }
 
@@ -610,11 +610,13 @@ function validateTeachingVisuals() {
     ".flow-line",
     ".timeline-board",
     ".message-sequence",
+    ".dependency-map",
+    ".lifecycle-routes",
   ]) {
     if (!styles.includes(contract)) fail(`teachingVisuals: missing style contract ${contract}`);
   }
   const total = [...expectedVisualsByPage.values()].reduce((sum, count) => sum + count, 0);
-  if (total !== 7) fail(`teachingVisuals: expected seven planned visuals, found ${total}`);
+  if (total !== 11) fail(`teachingVisuals: expected eleven planned visuals, found ${total}`);
 }
 
 try {
@@ -643,6 +645,6 @@ if (failures.length) {
   console.log(
     `Site validation passed: ${htmlFiles.length} HTML pages, ` +
     `${walk(docsRoot, ".js").length} JavaScript files, 125 quiz questions, ` +
-    "seven teaching visuals, persistent progress transitions, and book navigation contracts.",
+    "eleven teaching visuals, persistent progress transitions, and book navigation contracts.",
   );
 }

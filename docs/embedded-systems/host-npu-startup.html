@@ -6,7 +6,7 @@
   <meta name="description" content="Host CPU and NPU startup: PCIe and SoC discovery, driver binding, clocks, resets, power, firmware loading, remote processor control and ABI handshake.">
   <title>Host CPU and NPU Startup</title>
   <link rel="stylesheet" href="../styles.css?v=book-2">
-  <link rel="stylesheet" href="embedded.css?v=visual-1">
+  <link rel="stylesheet" href="embedded.css?v=visual-2">
   <script src="../theme-toggle.js"></script>
   <script src="../book-shell.js"></script>
 </head>
@@ -157,6 +157,27 @@
             <article class="concept-card"><h3>Recovering</h3><p>Invalidate stale handles, reset hardware, reload firmware and rebuild transport state before clients can resume.</p></article>
             <article class="concept-card"><h3>Suspended</h3><p>Save or discard context explicitly. Firmware availability, IOMMU mappings and queue ownership must be revalidated on resume.</p></article>
           </div>
+          <figure class="system-visual" aria-labelledby="remote-lifecycle-visual-title">
+            <div class="visual-heading">
+              <p class="visual-kicker">Lifecycle state machine</p>
+              <h3 id="remote-lifecycle-visual-title">Every restart creates a new transport generation</h3>
+            </div>
+            <div class="visual-scroll" role="img" tabindex="0" aria-label="The normal path is Offline to Loading to Running after firmware validation and handshake. A controlled stop quiesces DMA and returns Running to Offline. Power management can move Running to Suspended and resume only after mappings, firmware and queues are revalidated. A fault moves Running to Crashed, then Recovering, then Loading, and finally a new Running generation. Old handles and completions are invalid after recovery.">
+              <div class="flow-line">
+                <div class="flow-node security"><strong>Offline</strong><small>Reset asserted; submissions and DMA disabled</small></div>
+                <div class="flow-arrow" aria-hidden="true">→</div>
+                <div class="flow-node memory"><strong>Loading</strong><small>Validate and place firmware; prepare bootstrap resources</small></div>
+                <div class="flow-arrow" aria-hidden="true">→</div>
+                <div class="flow-node npu"><strong>Running</strong><small>HELLO accepted; queues tied to this boot generation</small></div>
+              </div>
+              <div class="lifecycle-routes" aria-hidden="true">
+                <div class="lifecycle-route"><strong>Controlled stop</strong><span>Running → stop submissions → quiesce IRQ/DMA → Offline</span></div>
+                <div class="lifecycle-route"><strong>Power route</strong><span>Running ⇄ Suspended · resume revalidates firmware, mappings and queue ownership</span></div>
+                <div class="lifecycle-route"><strong>Fault route</strong><span>Running → Crashed → capture evidence → Recovering → Loading → new Running generation</span></div>
+              </div>
+            </div>
+            <figcaption>Generation-scoped handles prevent commands or completions from a previous boot from entering the recovered transport.</figcaption>
+          </figure>
         </section>
 
         <section class="section" aria-labelledby="handshake">

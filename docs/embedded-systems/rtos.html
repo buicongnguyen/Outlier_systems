@@ -6,7 +6,7 @@
   <meta name="description" content="RTOS concepts: deterministic scheduling, interrupts, priority inversion, timers, IPC, memory allocation, watchdogs, and coordination with Linux and NPU processors.">
   <title>RTOS Concepts and Scheduling</title>
   <link rel="stylesheet" href="../styles.css?v=book-2">
-  <link rel="stylesheet" href="embedded.css?v=visual-1">
+  <link rel="stylesheet" href="embedded.css?v=visual-2">
   <script src="../theme-toggle.js"></script>
   <script src="../book-shell.js"></script>
 </head>
@@ -138,6 +138,26 @@
             <article class="concept-card"><h3>Control interrupt masking</h3><p>Long global-disable or high-priority critical sections directly increase worst-case interrupt latency. Measure maximum masked time.</p></article>
             <article class="concept-card"><h3>Budget nesting</h3><p>Higher-priority interrupts can preempt lower ones. Include nesting depth, handler time and stack usage in the worst-case design.</p></article>
           </div>
+          <figure class="system-visual" aria-labelledby="interrupt-deferral-visual-title">
+            <div class="visual-heading">
+              <p class="visual-kicker">Interrupt deferral</p>
+              <h3 id="interrupt-deferral-visual-title">Move quickly from hard-interrupt context to schedulable task work</h3>
+            </div>
+            <div class="visual-scroll" role="img" tabindex="0" aria-label="A device raises an interrupt. The bounded hard ISR acknowledges the source and captures minimal data. An ISR-safe notification or queue makes a high-priority task Ready. The scheduler may switch on ISR exit. The task performs parsing, allocation, logging or slower I/O in normal task context.">
+              <div class="flow-line">
+                <div class="flow-node npu"><strong>1 · Device IRQ</strong><small>Peripheral or NPU asserts an interrupt source</small></div>
+                <div class="flow-arrow" aria-hidden="true">→</div>
+                <div class="flow-node security"><strong>2 · Bounded ISR</strong><small>Acknowledge source; capture only loss-sensitive state</small></div>
+                <div class="flow-arrow" aria-hidden="true">→</div>
+                <div class="flow-node memory"><strong>3 · ISR-safe signal</strong><small>Notification, semaphore or queue makes the task Ready</small></div>
+                <div class="flow-arrow" aria-hidden="true">→</div>
+                <div class="flow-node host"><strong>4 · ISR exit</strong><small>Request a context switch if the awakened task outranks current work</small></div>
+                <div class="flow-arrow" aria-hidden="true">→</div>
+                <div class="flow-node host"><strong>5 · Deferred task</strong><small>Parse, allocate, log and perform bounded slow-path work</small></div>
+              </div>
+            </div>
+            <figcaption>The ISR protects latency by doing only what prevents data loss or interrupt retriggering. Everything that can block belongs in task context.</figcaption>
+          </figure>
           <div class="callout warning">
             <h3>Priority numbers are architecture-specific</h3>
             <p>
