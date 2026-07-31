@@ -546,6 +546,42 @@ function validatePageContracts() {
   if (!codingPage.idSet.has("toggle-all")) {
     fail("docs/coding-questions.html: missing #toggle-all solution control");
   }
+  const codeTabGroups = codingPage.pageTags.filter((tag) =>
+    tag.attrs.class?.split(/\s+/).includes("code-tabs"));
+  const languageTabLists = codingPage.pageTags.filter((tag) =>
+    tag.attrs.class?.split(/\s+/).includes("language-tabs") && tag.attrs.role === "tablist");
+  const languageTabs = codingPage.pageTags.filter((tag) =>
+    tag.name === "button" && tag.attrs.class?.split(/\s+/).includes("code-tab"));
+  const codePanels = codingPage.pageTags.filter((tag) =>
+    tag.attrs.class?.split(/\s+/).includes("code-panel"));
+  if (
+    codeTabGroups.length !== 12 || languageTabLists.length !== 12 ||
+    languageTabs.length !== 24 || codePanels.length !== 24
+  ) {
+    fail("docs/coding-questions.html: expected 12 accessible Python/C++ code-tab pairs");
+  }
+  if (
+    languageTabs.filter((tag) => tag.attrs["data-language"] === "python").length !== 12 ||
+    languageTabs.filter((tag) => tag.attrs["data-language"] === "cpp").length !== 12 ||
+    codePanels.filter((tag) => tag.attrs["data-language-panel"] === "python").length !== 12 ||
+    codePanels.filter((tag) => tag.attrs["data-language-panel"] === "cpp" && "hidden" in tag.attrs).length !== 12
+  ) {
+    fail("docs/coding-questions.html: every solution must start on Python with one hidden C++ panel");
+  }
+  const solutionCodeBlocks = [...codingPage.html.matchAll(/<pre class="code">([\s\S]*?)<\/pre>/g)]
+    .map((match) => match[1]);
+  if (solutionCodeBlocks.length !== 24) {
+    fail(`docs/coding-questions.html: expected 24 solution code blocks, found ${solutionCodeBlocks.length}`);
+  } else {
+    for (let index = 0; index < solutionCodeBlocks.length; index += 2) {
+      if (!solutionCodeBlocks[index].includes("# 1)")) {
+        fail(`docs/coding-questions.html: Python solution ${index / 2 + 1} lacks flow comments`);
+      }
+      if (!solutionCodeBlocks[index + 1].includes("// 1)")) {
+        fail(`docs/coding-questions.html: C++ solution ${index / 2 + 1} lacks flow comments`);
+      }
+    }
+  }
 
   const styleSources = [
     fs.readFileSync(path.join(docsRoot, "styles.css"), "utf8"),
@@ -645,6 +681,7 @@ if (failures.length) {
   console.log(
     `Site validation passed: ${htmlFiles.length} HTML pages, ` +
     `${walk(docsRoot, ".js").length} JavaScript files, 125 quiz questions, ` +
-    "eleven teaching visuals, persistent progress transitions, and book navigation contracts.",
+    "24 commented coding solutions, eleven teaching visuals, persistent progress transitions, " +
+    "and book navigation contracts.",
   );
 }

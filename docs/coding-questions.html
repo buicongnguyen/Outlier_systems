@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Twelve frequently asked coding interview questions with worked Python solutions: Blind 75 staples, Glassdoor-reported questions, and systems-flavored implementation problems.">
+  <meta name="description" content="Twelve frequently asked coding interview questions with commented Python and C++ solutions: Blind 75 staples, Glassdoor-reported questions, and systems-flavored implementation problems.">
   <title>Coding Interview Questions and Answers</title>
   <link rel="stylesheet" href="styles.css?v=book-2">
   <script src="theme-toggle.js"></script>
@@ -30,7 +30,21 @@
     .solution.show { display:block; }
     .solution h4 { margin:12px 0 6px; font-size:14px; text-transform:uppercase; color:var(--accent-strong); }
     .solution p { color:var(--muted); }
+    .code-tabs { margin-top:10px; }
+    .language-tabs { display:flex; gap:4px; margin:0; border-bottom:1px solid var(--line); }
+    .code-tab { min-height:38px; margin-bottom:-1px; padding:7px 16px; border:1px solid transparent; border-radius:6px 6px 0 0; background:transparent; color:var(--muted); font:inherit; font-size:13px; font-weight:800; cursor:pointer; }
+    .code-tab:hover { color:var(--accent-strong); background:var(--accent-soft); }
+    .code-tab[aria-selected="true"] { border-color:var(--line); border-bottom-color:var(--bg); background:var(--bg); color:var(--accent-strong); }
+    .code-tab:focus-visible { position:relative; z-index:1; outline:3px solid color-mix(in srgb, var(--accent) 45%, transparent); outline-offset:2px; }
+    .code-panel[hidden] { display:none; }
+    .code-panel .code { margin-top:0; border-top:0; border-radius:0 0 6px 6px; }
     .complexity { display:inline-block; margin-top:8px; padding:4px 10px; border-left:3px solid var(--accent); background:var(--accent-soft); border-radius:0 6px 6px 0; font-size:13px; font-weight:700; }
+    @media print {
+      .language-tabs { display:none; }
+      .code-panel[hidden] { display:block !important; }
+      .code-panel::before { display:block; margin:12px 0 4px; content:attr(data-label); color:var(--accent-strong); font-size:12px; font-weight:800; text-transform:uppercase; }
+      .code-panel .code { border:1px solid var(--line); border-radius:6px; }
+    }
   </style>
 </head>
 <body>
@@ -59,7 +73,7 @@
         low-level-design question banks. Part one covers the algorithm classics; part two covers the
         systems-flavored implementation questions this hub cares about (thread-safe queues, rate limiters,
         consistent hashing). Try each one before opening the solution — every answer includes the approach,
-        working Python, complexity, and the follow-ups interviewers actually ask.
+        commented Python and C++ implementations, complexity, and the follow-ups interviewers actually ask.
       </p>
     </section>
 
@@ -81,13 +95,53 @@
         <div class="solution">
           <h4>Approach</h4>
           <p>One pass with a hash map from value &rarr; index. For each number, check whether its complement (<code>target - num</code>) has already been seen. The brute force compares all pairs in O(n&sup2;); the map trades O(n) space for one lookup per element.</p>
-          <pre class="code">def two_sum(nums, target):
-    seen = {}                        # value -> index
+          <div class="code-tabs" data-code-tabs>
+            <div class="language-tabs" role="tablist" aria-label="Two Sum solution language">
+              <button class="code-tab" type="button" data-language="python">Python</button>
+              <button class="code-tab" type="button" data-language="cpp">C++</button>
+            </div>
+            <div class="code-panel" data-language-panel="python" data-label="Python solution">
+              <pre class="code">def two_sum(nums, target):
+    # 1) Remember each previously visited value and its index.
+    seen = {}
+
+    # 2) For the current value, look backward for its complement.
     for i, num in enumerate(nums):
         want = target - num
         if want in seen:
+            # 3) The stored index is different because insertion happens later.
             return [seen[want], i]
-        seen[num] = i                # store AFTER the check: no self-pairing</pre>
+
+        # 4) Make this value available to later elements; no self-pairing.
+        seen[num] = i
+
+    raise ValueError("no two-sum solution")</pre>
+            </div>
+            <div class="code-panel" data-language-panel="cpp" data-label="C++ solution" hidden>
+              <pre class="code">#include &lt;stdexcept&gt;
+#include &lt;unordered_map&gt;
+#include &lt;vector&gt;
+
+std::vector&lt;int&gt; twoSum(const std::vector&lt;int&gt;&amp; nums, int target) {
+    // 1) Map each previously visited value to its array index.
+    std::unordered_map&lt;int, int&gt; seen;
+
+    // 2) Search for the complement before storing the current value.
+    for (int i = 0; i &lt; static_cast&lt;int&gt;(nums.size()); ++i) {
+        const int want = target - nums[i];
+        if (auto match = seen.find(want); match != seen.end()) {
+            // 3) The stored element and current element form the answer.
+            return {match-&gt;second, i};
+        }
+
+        // 4) Insert afterward so one element cannot match itself.
+        seen[nums[i]] = i;
+    }
+
+    throw std::invalid_argument("no two-sum solution");
+}</pre>
+            </div>
+          </div>
           <span class="complexity">O(n) time, O(n) space</span>
           <h4>Pitfalls &amp; follow-ups</h4>
           <p>Insert into the map <em>after</em> checking, or <code>target = 2&times;num</code> matches the element with itself. Follow-ups: input sorted (two pointers, O(1) space), find all pairs, or 3Sum below.</p>
@@ -103,13 +157,45 @@
         <div class="solution">
           <h4>Approach</h4>
           <p>XOR every character code of both strings together: pairs cancel (x&oplus;x=0), leaving exactly the extra character. Equivalent one-liner: difference of summed character codes. Both beat the obvious Counter-diff on space.</p>
-          <pre class="code">def extra_char(s, t):
+          <div class="code-tabs" data-code-tabs>
+            <div class="language-tabs" role="tablist" aria-label="Extra Character solution language">
+              <button class="code-tab" type="button" data-language="python">Python</button>
+              <button class="code-tab" type="button" data-language="cpp">C++</button>
+            </div>
+            <div class="code-panel" data-language-panel="python" data-label="Python solution">
+              <pre class="code">def extra_char(s, t):
+    # 1) Zero is the identity value for XOR.
     acc = 0
-    for ch in s + t:
-        acc ^= ord(ch)      # duplicates cancel out pairwise
-    return chr(acc)
 
-# or: chr(sum(map(ord, t)) - sum(map(ord, s)))</pre>
+    # 2) Equal character codes cancel regardless of their shuffled order.
+    for ch in s:
+        acc ^= ord(ch)
+    for ch in t:
+        acc ^= ord(ch)
+
+    # 3) Only the unmatched character code remains.
+    return chr(acc)</pre>
+            </div>
+            <div class="code-panel" data-language-panel="cpp" data-label="C++ solution" hidden>
+              <pre class="code">#include &lt;string&gt;
+
+char extraChar(const std::string&amp; s, const std::string&amp; t) {
+    // 1) Zero is the identity value for XOR.
+    unsigned char accumulator = 0;
+
+    // 2) Every matching byte cancels with its copy in the other string.
+    for (const unsigned char ch : s) {
+        accumulator ^= ch;
+    }
+    for (const unsigned char ch : t) {
+        accumulator ^= ch;
+    }
+
+    // 3) The one byte without a partner is the extra character.
+    return static_cast&lt;char&gt;(accumulator);
+}</pre>
+            </div>
+          </div>
           <span class="complexity">O(n) time, O(1) space</span>
           <h4>Pitfalls &amp; follow-ups</h4>
           <p>State the invariant (XOR is commutative, associative, self-inverse) — that's what is being tested. Follow-up: the same trick solves "single number" (every element appears twice except one) and "missing number in 1..n".</p>
@@ -125,24 +211,86 @@
         <div class="solution">
           <h4>Approach</h4>
           <p>Sort, then for each anchor index run two pointers over the remainder looking for <code>-anchor</code>. Sorting makes duplicate-skipping possible: advance past equal values at the anchor and at both pointers after each hit.</p>
-          <pre class="code">def three_sum(nums):
+          <div class="code-tabs" data-code-tabs>
+            <div class="language-tabs" role="tablist" aria-label="3Sum solution language">
+              <button class="code-tab" type="button" data-language="python">Python</button>
+              <button class="code-tab" type="button" data-language="cpp">C++</button>
+            </div>
+            <div class="code-panel" data-language-panel="python" data-label="Python solution">
+              <pre class="code">def three_sum(nums):
+    # 1) Sorting enables a two-pointer scan and adjacent duplicate checks.
     nums.sort()
-    res = []
+    result = []
+
+    # 2) Fix one value as the anchor of each candidate triplet.
     for i in range(len(nums) - 2):
-        if i and nums[i] == nums[i-1]:          # skip duplicate anchors
-            continue
-        if nums[i] &gt; 0: break                    # sorted: no zero-sum ahead
-        lo, hi = i + 1, len(nums) - 1
-        while lo &lt; hi:
-            s = nums[i] + nums[lo] + nums[hi]
-            if s &lt; 0:   lo += 1
-            elif s &gt; 0: hi -= 1
+        if i &gt; 0 and nums[i] == nums[i - 1]:
+            continue  # This anchor would reproduce earlier triplets.
+        if nums[i] &gt; 0:
+            break  # All remaining values are positive.
+
+        # 3) Move two pointers according to whether the sum is low or high.
+        left, right = i + 1, len(nums) - 1
+        while left &lt; right:
+            total = nums[i] + nums[left] + nums[right]
+            if total &lt; 0:
+                left += 1
+            elif total &gt; 0:
+                right -= 1
             else:
-                res.append([nums[i], nums[lo], nums[hi]])
-                while lo &lt; hi and nums[lo] == nums[lo+1]: lo += 1
-                while lo &lt; hi and nums[hi] == nums[hi-1]: hi -= 1
-                lo += 1; hi -= 1
-    return res</pre>
+                result.append([nums[i], nums[left], nums[right]])
+
+                # 4) Skip equal pointer values before searching again.
+                while left &lt; right and nums[left] == nums[left + 1]:
+                    left += 1
+                while left &lt; right and nums[right] == nums[right - 1]:
+                    right -= 1
+                left += 1
+                right -= 1
+
+    return result</pre>
+            </div>
+            <div class="code-panel" data-language-panel="cpp" data-label="C++ solution" hidden>
+              <pre class="code">#include &lt;algorithm&gt;
+#include &lt;vector&gt;
+
+std::vector&lt;std::vector&lt;int&gt;&gt; threeSum(std::vector&lt;int&gt; nums) {
+    // 1) Sort a copy so duplicates are adjacent and pointers are monotonic.
+    std::sort(nums.begin(), nums.end());
+    std::vector&lt;std::vector&lt;int&gt;&gt; result;
+
+    // 2) Fix one anchor, then solve a two-sum problem to its right.
+    for (int i = 0; i + 2 &lt; static_cast&lt;int&gt;(nums.size()); ++i) {
+        if (i &gt; 0 &amp;&amp; nums[i] == nums[i - 1]) continue;
+        if (nums[i] &gt; 0) break;
+
+        int left = i + 1;
+        int right = static_cast&lt;int&gt;(nums.size()) - 1;
+
+        // 3) Increase a low sum from the left or decrease a high sum.
+        while (left &lt; right) {
+            const long long total =
+                static_cast&lt;long long&gt;(nums[i]) + nums[left] + nums[right];
+            if (total &lt; 0) {
+                ++left;
+            } else if (total &gt; 0) {
+                --right;
+            } else {
+                result.push_back({nums[i], nums[left], nums[right]});
+
+                // 4) Skip duplicates so every emitted triplet is unique.
+                const int leftValue = nums[left];
+                const int rightValue = nums[right];
+                while (left &lt; right &amp;&amp; nums[left] == leftValue) ++left;
+                while (left &lt; right &amp;&amp; nums[right] == rightValue) --right;
+            }
+        }
+    }
+
+    return result;
+}</pre>
+            </div>
+          </div>
           <span class="complexity">O(n&sup2;) time, O(1) extra space (beyond sort/output)</span>
           <h4>Pitfalls &amp; follow-ups</h4>
           <p>The interview is really about the three duplicate-skips — a set-of-tuples dedupe works but signals brute force. Follow-ups: 3Sum-closest, 4Sum (one more anchor loop), k-Sum recursion.</p>
@@ -158,15 +306,53 @@
         <div class="solution">
           <h4>Approach</h4>
           <p>Sort by start. Sweep left to right keeping the last merged interval: if the next start fits inside it (<code>start &le; last_end</code>), extend the end with <code>max</code>; otherwise emit a new interval. Sorting is what turns "compare everything with everything" into one linear pass.</p>
-          <pre class="code">def merge(intervals):
-    intervals.sort(key=lambda iv: iv[0])
-    out = []
+          <div class="code-tabs" data-code-tabs>
+            <div class="language-tabs" role="tablist" aria-label="Merge Intervals solution language">
+              <button class="code-tab" type="button" data-language="python">Python</button>
+              <button class="code-tab" type="button" data-language="cpp">C++</button>
+            </div>
+            <div class="code-panel" data-language-panel="python" data-label="Python solution">
+              <pre class="code">def merge(intervals):
+    # 1) Ordered starts guarantee only the last merged interval can overlap.
+    intervals.sort(key=lambda interval: interval[0])
+    merged = []
+
+    # 2) Sweep once from the earliest start to the latest.
     for start, end in intervals:
-        if out and start &lt;= out[-1][1]:          # overlaps (or touches) last
-            out[-1][1] = max(out[-1][1], end)    # extend — max matters!
+        if merged and start &lt;= merged[-1][1]:
+            # 3) Grow the current interval; max preserves a containing interval.
+            merged[-1][1] = max(merged[-1][1], end)
         else:
-            out.append([start, end])
-    return out</pre>
+            # 4) A gap starts a new disjoint interval.
+            merged.append([start, end])
+
+    return merged</pre>
+            </div>
+            <div class="code-panel" data-language-panel="cpp" data-label="C++ solution" hidden>
+              <pre class="code">#include &lt;algorithm&gt;
+#include &lt;vector&gt;
+
+std::vector&lt;std::vector&lt;int&gt;&gt; mergeIntervals(
+    std::vector&lt;std::vector&lt;int&gt;&gt; intervals) {
+    // 1) Lexicographic vector ordering sorts by start, then end.
+    std::sort(intervals.begin(), intervals.end());
+    std::vector&lt;std::vector&lt;int&gt;&gt; merged;
+
+    // 2) Only the latest merged interval can overlap the next one.
+    for (const auto&amp; interval : intervals) {
+        if (!merged.empty() &amp;&amp; interval[0] &lt;= merged.back()[1]) {
+            // 3) Preserve the farther end when one interval contains another.
+            merged.back()[1] = std::max(merged.back()[1], interval[1]);
+        } else {
+            // 4) No overlap means this begins a new output interval.
+            merged.push_back(interval);
+        }
+    }
+
+    return merged;
+}</pre>
+            </div>
+          </div>
           <span class="complexity">O(n log n) time, O(n) output</span>
           <h4>Pitfalls &amp; follow-ups</h4>
           <p>The <code>max()</code> is the classic bug: <code>[1,10],[2,3]</code> must stay <code>[1,10]</code>. Clarify whether touching intervals ([1,2],[2,3]) merge. Follow-ups: insert-interval into a sorted list, minimum meeting rooms (heap of end times).</p>
@@ -182,13 +368,50 @@
         <div class="solution">
           <h4>Approach</h4>
           <p>Pass down the open interval each node must fall in: root gets (-&infin;, +&infin;); going left tightens the upper bound, going right the lower. Alternative with the same power: an in-order traversal of a BST must be strictly increasing.</p>
-          <pre class="code">def is_bst(node, lo=float("-inf"), hi=float("inf")):
+          <div class="code-tabs" data-code-tabs>
+            <div class="language-tabs" role="tablist" aria-label="Validate BST solution language">
+              <button class="code-tab" type="button" data-language="python">Python</button>
+              <button class="code-tab" type="button" data-language="cpp">C++</button>
+            </div>
+            <div class="code-panel" data-language-panel="python" data-label="Python solution">
+              <pre class="code">def is_bst(node, low=float("-inf"), high=float("inf")):
+    # 1) An empty subtree satisfies every inherited bound.
     if node is None:
         return True
-    if not (lo &lt; node.val &lt; hi):        # must respect ALL ancestors
+
+    # 2) Validate against all ancestors, not only the parent.
+    if not (low &lt; node.val &lt; high):
         return False
-    return (is_bst(node.left,  lo, node.val) and
-            is_bst(node.right, node.val, hi))</pre>
+
+    # 3) The current value becomes the tighter bound for each child.
+    return (is_bst(node.left, low, node.val) and
+            is_bst(node.right, node.val, high))</pre>
+            </div>
+            <div class="code-panel" data-language-panel="cpp" data-label="C++ solution" hidden>
+              <pre class="code">#include &lt;limits&gt;
+
+struct TreeNode {
+    int value;
+    TreeNode* left = nullptr;
+    TreeNode* right = nullptr;
+};
+
+bool isBst(
+    const TreeNode* node,
+    long long low = std::numeric_limits&lt;long long&gt;::lowest(),
+    long long high = std::numeric_limits&lt;long long&gt;::max()) {
+    // 1) An empty subtree cannot violate the BST invariant.
+    if (node == nullptr) return true;
+
+    // 2) Long-long bounds safely sit outside every possible int value.
+    if (!(low &lt; node-&gt;value &amp;&amp; node-&gt;value &lt; high)) return false;
+
+    // 3) Propagate every ancestor constraint into both subtrees.
+    return isBst(node-&gt;left, low, node-&gt;value) &amp;&amp;
+           isBst(node-&gt;right, node-&gt;value, high);
+}</pre>
+            </div>
+          </div>
           <span class="complexity">O(n) time, O(h) recursion stack</span>
           <h4>Pitfalls &amp; follow-ups</h4>
           <p>The famous wrong answer checks only <code>left.val &lt; node.val &lt; right.val</code> — it accepts a grandchild that violates a grandparent's bound. Also decide how duplicates are treated (strict &lt; here). Follow-ups: recover a BST with two swapped nodes; kth smallest via in-order.</p>
@@ -204,22 +427,76 @@
         <div class="solution">
           <h4>Approach</h4>
           <p>DP: <code>dp[i]</code> = best LIS ending at i, looking back at all j&lt;i — O(n&sup2;). Patience method: keep <code>tails[k]</code> = smallest possible tail of an increasing subsequence of length k+1; each element binary-searches its slot. <code>tails</code> stays sorted, its length is the answer.</p>
-          <pre class="code">def lis_quadratic(nums):                 # the explainable one
+          <div class="code-tabs" data-code-tabs>
+            <div class="language-tabs" role="tablist" aria-label="Longest Increasing Subsequence solution language">
+              <button class="code-tab" type="button" data-language="python">Python</button>
+              <button class="code-tab" type="button" data-language="cpp">C++</button>
+            </div>
+            <div class="code-panel" data-language-panel="python" data-label="Python solution">
+              <pre class="code">def lis_quadratic(nums):
+    # 1) dp[i] stores the best increasing subsequence ending exactly at i.
     dp = [1] * len(nums)
     for i in range(len(nums)):
+        # 2) Extend every earlier subsequence whose tail is smaller.
         for j in range(i):
             if nums[j] &lt; nums[i]:
                 dp[i] = max(dp[i], dp[j] + 1)
     return max(dp, default=0)
 
-import bisect
-def lis_nlogn(nums):                     # the impressive one
-    tails = []                           # tails[k] = min tail of LIS len k+1
-    for x in nums:
-        k = bisect.bisect_left(tails, x) # first tail &gt;= x
-        if k == len(tails): tails.append(x)
-        else:               tails[k] = x # smaller tail = more room to grow
+
+from bisect import bisect_left
+
+def lis_nlogn(nums):
+    # 1) tails[k] is the smallest tail found for length k + 1.
+    tails = []
+    for value in nums:
+        # 2) Replace the first tail &gt;= value, keeping tails sorted.
+        index = bisect_left(tails, value)
+        if index == len(tails):
+            # 3) No replacement means a longer subsequence now exists.
+            tails.append(value)
+        else:
+            tails[index] = value
     return len(tails)</pre>
+            </div>
+            <div class="code-panel" data-language-panel="cpp" data-label="C++ solution" hidden>
+              <pre class="code">#include &lt;algorithm&gt;
+#include &lt;vector&gt;
+
+int lisQuadratic(const std::vector&lt;int&gt;&amp; nums) {
+    // 1) dp[i] is the best subsequence ending at index i.
+    std::vector&lt;int&gt; dp(nums.size(), 1);
+    int best = 0;
+
+    // 2) Try extending every compatible earlier endpoint.
+    for (int i = 0; i &lt; static_cast&lt;int&gt;(nums.size()); ++i) {
+        for (int j = 0; j &lt; i; ++j) {
+            if (nums[j] &lt; nums[i]) dp[i] = std::max(dp[i], dp[j] + 1);
+        }
+        best = std::max(best, dp[i]);
+    }
+    return best;
+}
+
+int lisNlogN(const std::vector&lt;int&gt;&amp; nums) {
+    // 1) tails[k] keeps the minimum tail for subsequence length k + 1.
+    std::vector&lt;int&gt; tails;
+
+    for (const int value : nums) {
+        // 2) lower_bound enforces strictly increasing subsequences.
+        auto position = std::lower_bound(tails.begin(), tails.end(), value);
+        if (position == tails.end()) {
+            // 3) This value extends the longest length seen so far.
+            tails.push_back(value);
+        } else {
+            // 4) A smaller tail leaves more room for future values.
+            *position = value;
+        }
+    }
+    return static_cast&lt;int&gt;(tails.size());
+}</pre>
+            </div>
+          </div>
           <span class="complexity">O(n&sup2;) / O(n log n) time</span>
           <h4>Pitfalls &amp; follow-ups</h4>
           <p><code>tails</code> is NOT the subsequence itself — only its length is meaningful (reconstructing needs parent links). <code>bisect_left</code> vs <code>bisect_right</code> is the strict-vs-non-strict switch. Follow-up: Russian doll envelopes = LIS after a sort trick.</p>
@@ -235,27 +512,101 @@ def lis_nlogn(nums):                     # the impressive one
         <div class="solution">
           <h4>Approach</h4>
           <p>Count with a hash map, then select. A size-k min-heap over (count, value) gives O(n log k) — the heap holds the current best k, and anything smaller than its root can't be top-k. Bucket sort by count reaches O(n): index buckets by frequency (at most n), walk from the top.</p>
-          <pre class="code">from collections import Counter
+          <div class="code-tabs" data-code-tabs>
+            <div class="language-tabs" role="tablist" aria-label="Top K Frequent solution language">
+              <button class="code-tab" type="button" data-language="python">Python</button>
+              <button class="code-tab" type="button" data-language="cpp">C++</button>
+            </div>
+            <div class="code-panel" data-language-panel="python" data-label="Python solution">
+              <pre class="code">from collections import Counter
 import heapq
 
 def top_k(nums, k):
-    counts = Counter(nums)                          # O(n)
-    return [v for v, _ in
-            heapq.nlargest(k, counts.items(), key=lambda kv: kv[1])]
+    # 1) Collapse repeated input values into (value, frequency) pairs.
+    counts = Counter(nums)
 
-def top_k_bucket(nums, k):                          # O(n) version
+    # 2) Keep only the k greatest pairs according to frequency.
+    largest = heapq.nlargest(k, counts.items(), key=lambda pair: pair[1])
+
+    # 3) The problem returns values, not their counts.
+    return [value for value, _ in largest]
+
+
+def top_k_bucket(nums, k):
     if k &lt;= 0:
         return []
+
+    # 1) A value can appear at most len(nums) times.
     counts = Counter(nums)
-    buckets = [[] for _ in range(len(nums) + 1)]    # index = frequency
-    for val, c in counts.items():
-        buckets[c].append(val)
-    out = []
-    for c in range(len(buckets) - 1, 0, -1):
-        for val in buckets[c]:
-            out.append(val)
-            if len(out) == k: return out
-    return out</pre>
+    buckets = [[] for _ in range(len(nums) + 1)]
+    for value, frequency in counts.items():
+        buckets[frequency].append(value)
+
+    # 2) Read buckets from highest frequency downward until k values exist.
+    result = []
+    for frequency in range(len(buckets) - 1, 0, -1):
+        for value in buckets[frequency]:
+            result.append(value)
+            if len(result) == k:
+                return result
+    return result</pre>
+            </div>
+            <div class="code-panel" data-language-panel="cpp" data-label="C++ solution" hidden>
+              <pre class="code">#include &lt;functional&gt;
+#include &lt;queue&gt;
+#include &lt;unordered_map&gt;
+#include &lt;utility&gt;
+#include &lt;vector&gt;
+
+std::vector&lt;int&gt; topK(const std::vector&lt;int&gt;&amp; nums, int k) {
+    if (k &lt;= 0) return {};
+
+    // 1) Count every distinct value in one input pass.
+    std::unordered_map&lt;int, int&gt; counts;
+    for (const int value : nums) ++counts[value];
+
+    // 2) Keep a min-heap of the best k (frequency, value) pairs.
+    using Entry = std::pair&lt;int, int&gt;;
+    std::priority_queue&lt;Entry, std::vector&lt;Entry&gt;, std::greater&lt;Entry&gt;&gt; heap;
+    for (const auto&amp; [value, frequency] : counts) {
+        heap.emplace(frequency, value);
+        if (static_cast&lt;int&gt;(heap.size()) &gt; k) heap.pop();
+    }
+
+    // 3) Extract the retained values; their order is not significant.
+    std::vector&lt;int&gt; result;
+    while (!heap.empty()) {
+        result.push_back(heap.top().second);
+        heap.pop();
+    }
+    return result;
+}
+
+std::vector&lt;int&gt; topKBucket(const std::vector&lt;int&gt;&amp; nums, int k) {
+    if (k &lt;= 0) return {};
+
+    // 1) Group values by frequency; no frequency exceeds nums.size().
+    std::unordered_map&lt;int, int&gt; counts;
+    for (const int value : nums) ++counts[value];
+    std::vector&lt;std::vector&lt;int&gt;&gt; buckets(nums.size() + 1);
+    for (const auto&amp; [value, frequency] : counts) {
+        buckets[frequency].push_back(value);
+    }
+
+    // 2) Walk from the most frequent bucket until k values are collected.
+    std::vector&lt;int&gt; result;
+    for (int frequency = static_cast&lt;int&gt;(nums.size());
+         frequency &gt; 0 &amp;&amp; static_cast&lt;int&gt;(result.size()) &lt; k;
+         --frequency) {
+        for (const int value : buckets[frequency]) {
+            result.push_back(value);
+            if (static_cast&lt;int&gt;(result.size()) == k) break;
+        }
+    }
+    return result;
+}</pre>
+            </div>
+          </div>
           <span class="complexity">O(n log k) heap / O(n) bucket</span>
           <h4>Pitfalls &amp; follow-ups</h4>
           <p>Say why it beats full sorting (O(n log n) wastes work ordering elements you'll discard). Follow-ups: top-k in a stream (keep the k-heap), across sharded logs (local top-k, then merge — connects to the distributed section of this hub).</p>
@@ -280,26 +631,94 @@ def top_k_bucket(nums, k):                          # O(n) version
         <div class="solution">
           <h4>Approach</h4>
           <p>Recency order needs a sequence with O(1) move-to-front and remove-tail: a doubly linked list. Key lookup needs O(1): a hash map pointing at the list nodes. Every get/put unlinks the node and re-links it at the front; eviction pops the tail. Python's <code>OrderedDict</code> packages exactly this pair.</p>
-          <pre class="code">from collections import OrderedDict
+          <div class="code-tabs" data-code-tabs>
+            <div class="language-tabs" role="tablist" aria-label="LRU Cache solution language">
+              <button class="code-tab" type="button" data-language="python">Python</button>
+              <button class="code-tab" type="button" data-language="cpp">C++</button>
+            </div>
+            <div class="code-panel" data-language-panel="python" data-label="Python solution">
+              <pre class="code">from collections import OrderedDict
 
 class LRUCache:
     def __init__(self, capacity):
         if capacity &lt;= 0:
             raise ValueError("capacity must be positive")
-        self.cap = capacity
-        self.od = OrderedDict()          # front = oldest, end = newest
+
+        # 1) OrderedDict combines a hash map with a linked recency order.
+        self.capacity = capacity
+        self.entries = OrderedDict()  # front = oldest, end = newest
 
     def get(self, key):
-        if key not in self.od: return -1
-        self.od.move_to_end(key)         # O(1): relink node as most recent
-        return self.od[key]
+        # 2) A miss does not change recency.
+        if key not in self.entries:
+            return -1
+
+        # 3) A hit becomes the most recently used entry.
+        self.entries.move_to_end(key)
+        return self.entries[key]
 
     def put(self, key, value):
-        if key in self.od:
-            self.od.move_to_end(key)
-        self.od[key] = value
-        if len(self.od) &gt; self.cap:
-            self.od.popitem(last=False)  # O(1): evict least recent</pre>
+        # 4) Insert/update and mark the key as most recently used.
+        if key in self.entries:
+            self.entries.move_to_end(key)
+        self.entries[key] = value
+
+        # 5) Remove exactly one oldest entry when capacity is exceeded.
+        if len(self.entries) &gt; self.capacity:
+            self.entries.popitem(last=False)</pre>
+            </div>
+            <div class="code-panel" data-language-panel="cpp" data-label="C++ solution" hidden>
+              <pre class="code">#include &lt;cstddef&gt;
+#include &lt;list&gt;
+#include &lt;stdexcept&gt;
+#include &lt;unordered_map&gt;
+#include &lt;utility&gt;
+
+class LRUCache {
+public:
+    explicit LRUCache(std::size_t capacity) : capacity_(capacity) {
+        if (capacity_ == 0) throw std::invalid_argument("capacity must be positive");
+    }
+
+    int get(int key) {
+        // 1) The hash map finds the corresponding list node in O(1) average time.
+        const auto found = index_.find(key);
+        if (found == index_.end()) return -1;
+
+        // 2) Move the hit to the front, which represents most recently used.
+        entries_.splice(entries_.begin(), entries_, found-&gt;second);
+        return found-&gt;second-&gt;second;
+    }
+
+    void put(int key, int value) {
+        if (auto found = index_.find(key); found != index_.end()) {
+            // 3) Update an existing node and refresh its recency.
+            found-&gt;second-&gt;second = value;
+            entries_.splice(entries_.begin(), entries_, found-&gt;second);
+            return;
+        }
+
+        // 4) Insert new entries at the most-recent front of the list.
+        entries_.emplace_front(key, value);
+        index_[key] = entries_.begin();
+
+        if (entries_.size() &gt; capacity_) {
+            // 5) The back is least recent; erase it from both data structures.
+            index_.erase(entries_.back().first);
+            entries_.pop_back();
+        }
+    }
+
+private:
+    using Entry = std::pair&lt;int, int&gt;;
+    using Iterator = std::list&lt;Entry&gt;::iterator;
+
+    std::size_t capacity_;
+    std::list&lt;Entry&gt; entries_;              // front = newest, back = oldest
+    std::unordered_map&lt;int, Iterator&gt; index_;
+};</pre>
+            </div>
+          </div>
           <span class="complexity">O(1) get / put, O(capacity) space</span>
           <h4>Pitfalls &amp; follow-ups</h4>
           <p>If asked to build it raw: sentinel head/tail nodes remove all the null-pointer edge cases; a plain singly linked list fails (O(n) unlink). Follow-ups: thread-safety (one lock, or sharded locks), TTL entries, LFU (LeetCode 460 — count buckets), and "what does Redis actually do?" (approximate LRU sampling).</p>
@@ -315,33 +734,100 @@ class LRUCache:
         <div class="solution">
           <h4>Approach</h4>
           <p>One mutex guards the buffer; two condition variables carry the two wait reasons (<em>not_full</em> for producers, <em>not_empty</em> for consumers). Waits sit in <code>while</code> loops re-checking the predicate — wakeups are hints, not guarantees — and each side signals the <em>other</em> side after mutating.</p>
-          <pre class="code">import threading
+          <div class="code-tabs" data-code-tabs>
+            <div class="language-tabs" role="tablist" aria-label="Bounded Queue solution language">
+              <button class="code-tab" type="button" data-language="python">Python</button>
+              <button class="code-tab" type="button" data-language="cpp">C++</button>
+            </div>
+            <div class="code-panel" data-language-panel="python" data-label="Python solution">
+              <pre class="code">import threading
 from collections import deque
 
 class BoundedQueue:
     def __init__(self, capacity):
         if capacity &lt;= 0:
             raise ValueError("capacity must be positive")
-        self.buf = deque()
-        self.cap = capacity
+
+        # 1) One lock protects both the queue data and both wait predicates.
+        self.buffer = deque()
+        self.capacity = capacity
         self.lock = threading.Lock()
-        self.not_full  = threading.Condition(self.lock)
+        self.not_full = threading.Condition(self.lock)
         self.not_empty = threading.Condition(self.lock)
 
     def put(self, item):
         with self.not_full:
-            while len(self.buf) == self.cap:   # WHILE, never if:
-                self.not_full.wait()           # spurious wakeups + races
-            self.buf.append(item)
-            self.not_empty.notify()            # wake one waiting consumer
+            # 2) Recheck after every wakeup: another producer may win the slot.
+            while len(self.buffer) == self.capacity:
+                self.not_full.wait()
+
+            # 3) Publish the item while holding the same predicate lock.
+            self.buffer.append(item)
+            self.not_empty.notify()  # A consumer may now make progress.
 
     def take(self):
         with self.not_empty:
-            while not self.buf:
+            # 4) Sleep without busy-waiting until an item is truly available.
+            while not self.buffer:
                 self.not_empty.wait()
-            item = self.buf.popleft()
-            self.not_full.notify()              # wake one waiting producer
+
+            item = self.buffer.popleft()
+            self.not_full.notify()  # A producer may now make progress.
             return item</pre>
+            </div>
+            <div class="code-panel" data-language-panel="cpp" data-label="C++ solution" hidden>
+              <pre class="code">#include &lt;condition_variable&gt;
+#include &lt;cstddef&gt;
+#include &lt;deque&gt;
+#include &lt;mutex&gt;
+#include &lt;stdexcept&gt;
+#include &lt;utility&gt;
+
+template &lt;typename T&gt;
+class BoundedQueue {
+public:
+    explicit BoundedQueue(std::size_t capacity) : capacity_(capacity) {
+        if (capacity_ == 0) throw std::invalid_argument("capacity must be positive");
+    }
+
+    void put(T item) {
+        std::unique_lock&lt;std::mutex&gt; lock(mutex_);
+
+        // 1) The predicate handles spurious wakeups and competing producers.
+        notFull_.wait(lock, [this] { return buffer_.size() &lt; capacity_; });
+
+        // 2) Mutate the queue while the predicate's mutex is held.
+        buffer_.push_back(std::move(item));
+        lock.unlock();
+
+        // 3) Wake one consumer after publishing the new item.
+        notEmpty_.notify_one();
+    }
+
+    T take() {
+        std::unique_lock&lt;std::mutex&gt; lock(mutex_);
+
+        // 4) Sleep efficiently until a producer makes the queue non-empty.
+        notEmpty_.wait(lock, [this] { return !buffer_.empty(); });
+
+        T item = std::move(buffer_.front());
+        buffer_.pop_front();
+        lock.unlock();
+
+        // 5) The freed slot allows one producer to continue.
+        notFull_.notify_one();
+        return item;
+    }
+
+private:
+    const std::size_t capacity_;
+    std::deque&lt;T&gt; buffer_;
+    std::mutex mutex_;
+    std::condition_variable notFull_;
+    std::condition_variable notEmpty_;
+};</pre>
+            </div>
+          </div>
           <span class="complexity">O(1) per operation; waiting threads sleep (no CPU burn)</span>
           <h4>Pitfalls &amp; follow-ups</h4>
           <p>The three classic mistakes: <code>if</code> instead of <code>while</code> around wait; one shared condition with <code>notify()</code> (a producer can wake a producer — use two conditions or <code>notify_all</code>); signaling before releasing consistency. Follow-ups: implement with two semaphores (empty/full slots), poison-pill shutdown, and why unbounded queues break backpressure (ties to the distributed section).</p>
@@ -357,28 +843,91 @@ class BoundedQueue:
         <div class="solution">
           <h4>Approach</h4>
           <p>Lazy refill: no background thread — on each call, compute tokens earned since the last refill from a <em>monotonic</em> clock, cap at capacity, then atomically check-and-decrement under a lock. The check and the decrement must be one critical section or two threads both pass on the last token.</p>
-          <pre class="code">import threading, time
+          <div class="code-tabs" data-code-tabs>
+            <div class="language-tabs" role="tablist" aria-label="Token Bucket solution language">
+              <button class="code-tab" type="button" data-language="python">Python</button>
+              <button class="code-tab" type="button" data-language="cpp">C++</button>
+            </div>
+            <div class="code-panel" data-language-panel="python" data-label="Python solution">
+              <pre class="code">import threading
+import time
 
 class TokenBucket:
     def __init__(self, rate, capacity):
         if rate &lt;= 0 or capacity &lt;= 0:
             raise ValueError("rate and capacity must be positive")
-        self.rate = rate                  # tokens added per second
-        self.cap = capacity               # max burst
-        self.tokens = capacity
-        self.last = time.monotonic()      # NEVER time.time(): it can jump
+
+        # 1) Start full so the configured burst is immediately available.
+        self.rate = rate
+        self.capacity = capacity
+        self.tokens = float(capacity)
+        self.last_refill = time.monotonic()
         self.lock = threading.Lock()
 
     def allow(self):
-        with self.lock:                   # read-refill-decrement is atomic
-            now = time.monotonic()
-            self.tokens = min(self.cap,
-                              self.tokens + (now - self.last) * self.rate)
-            self.last = now
-            if self.tokens &gt;= 1:
-                self.tokens -= 1
-                return True
-            return False                  # caller: reject or queue</pre>
+        # 2) Refill, test and consume as one atomic state transition.
+        with self.lock:
+            now = time.monotonic()  # Monotonic time cannot jump backward.
+            elapsed = now - self.last_refill
+
+            # 3) Refill lazily and cap stored credit at burst capacity.
+            self.tokens = min(
+                self.capacity,
+                self.tokens + elapsed * self.rate,
+            )
+            self.last_refill = now
+
+            # 4) Admit only when a complete token can be consumed.
+            if self.tokens &lt; 1.0:
+                return False
+            self.tokens -= 1.0
+            return True</pre>
+            </div>
+            <div class="code-panel" data-language-panel="cpp" data-label="C++ solution" hidden>
+              <pre class="code">#include &lt;algorithm&gt;
+#include &lt;chrono&gt;
+#include &lt;mutex&gt;
+#include &lt;stdexcept&gt;
+
+class TokenBucket {
+public:
+    TokenBucket(double rate, double capacity)
+        : rate_(rate), capacity_(capacity), tokens_(capacity),
+          lastRefill_(Clock::now()) {
+        if (rate_ &lt;= 0.0 || capacity_ &lt;= 0.0) {
+            throw std::invalid_argument("rate and capacity must be positive");
+        }
+    }
+
+    bool allow() {
+        // 1) Refill, test and consume while one lock protects bucket state.
+        std::lock_guard&lt;std::mutex&gt; guard(mutex_);
+        const auto now = Clock::now();
+
+        // 2) steady_clock measures elapsed time and never follows wall-clock jumps.
+        const double elapsed = std::chrono::duration&lt;double&gt;(now - lastRefill_).count();
+
+        // 3) Lazy refill removes the need for a background timer thread.
+        tokens_ = std::min(capacity_, tokens_ + elapsed * rate_);
+        lastRefill_ = now;
+
+        // 4) Consume one complete token or reject without changing the balance.
+        if (tokens_ &lt; 1.0) return false;
+        tokens_ -= 1.0;
+        return true;
+    }
+
+private:
+    using Clock = std::chrono::steady_clock;
+
+    const double rate_;
+    const double capacity_;
+    double tokens_;
+    Clock::time_point lastRefill_;
+    std::mutex mutex_;
+};</pre>
+            </div>
+          </div>
           <span class="complexity">O(1) per call, O(1) state per bucket</span>
           <h4>Pitfalls &amp; follow-ups</h4>
           <p>Wall-clock time breaks on NTP jumps — use monotonic. Fractional tokens are fine (float); per-key buckets go in a dict (mind cleanup). Follow-ups: token bucket vs leaky bucket vs sliding window; distributed version (state in Redis, refill+decrement in one atomic Lua script — the same race, solved the same way).</p>
@@ -394,20 +943,87 @@ class TokenBucket:
         <div class="solution">
           <h4>Approach</h4>
           <p>Delay for attempt n is <code>random.uniform(0, min(cap, base &times; 2&#8319;))</code> — "full jitter". The exponential spreads load over time; the randomization decorrelates clients so a synchronized failure doesn't retry as a synchronized stampede.</p>
-          <pre class="code">import random, time
+          <div class="code-tabs" data-code-tabs>
+            <div class="language-tabs" role="tablist" aria-label="Retry solution language">
+              <button class="code-tab" type="button" data-language="python">Python</button>
+              <button class="code-tab" type="button" data-language="cpp">C++</button>
+            </div>
+            <div class="code-panel" data-language-panel="python" data-label="Python solution">
+              <pre class="code">import random
+import time
 
 def retry(fn, max_attempts=5, base=0.1, cap=10.0,
           retryable=(TimeoutError, ConnectionError)):
     if max_attempts &lt;= 0 or base &lt; 0 or cap &lt; 0:
         raise ValueError("invalid retry policy")
+
+    # 1) The loop count is the total attempt budget, not retry count.
     for attempt in range(max_attempts):
         try:
             return fn()
         except retryable:
+            # 2) Surface the final transient failure when the budget is empty.
             if attempt == max_attempts - 1:
-                raise                          # budget exhausted: surface it
-            delay = random.uniform(0, min(cap, base * 2 ** attempt))
-            time.sleep(delay)                  # full jitter: U(0, exp cap)</pre>
+                raise
+
+            # 3) Exponential growth is capped; full jitter spreads clients out.
+            maximum_delay = min(cap, base * 2 ** attempt)
+            delay = random.uniform(0, maximum_delay)
+
+            # 4) Wait before the next attempt; production code also checks a deadline.
+            time.sleep(delay)</pre>
+            </div>
+            <div class="code-panel" data-language-panel="cpp" data-label="C++ solution" hidden>
+              <pre class="code">#include &lt;algorithm&gt;
+#include &lt;chrono&gt;
+#include &lt;exception&gt;
+#include &lt;functional&gt;
+#include &lt;random&gt;
+#include &lt;stdexcept&gt;
+#include &lt;thread&gt;
+#include &lt;type_traits&gt;
+#include &lt;utility&gt;
+
+template &lt;typename Function, typename IsRetryable&gt;
+auto retry(Function&amp;&amp; function, IsRetryable&amp;&amp; isRetryable,
+           int maxAttempts = 5,
+           std::chrono::milliseconds base = std::chrono::milliseconds(100),
+           std::chrono::milliseconds cap = std::chrono::seconds(10))
+    -&gt; std::invoke_result_t&lt;Function&amp;&gt; {
+    if (maxAttempts &lt;= 0 || base.count() &lt; 0 || cap.count() &lt; 0) {
+        throw std::invalid_argument("invalid retry policy");
+    }
+
+    std::mt19937_64 randomEngine(std::random_device{}());
+
+    // 1) Count total attempts so the final failure has a precise boundary.
+    for (int attempt = 0; attempt &lt; maxAttempts; ++attempt) {
+        try {
+            return std::invoke(function);
+        } catch (const std::exception&amp; error) {
+            // 2) Never retry permanent failures or exceed the attempt budget.
+            if (!std::invoke(isRetryable, error) || attempt == maxAttempts - 1) {
+                throw;
+            }
+
+            // 3) Double the ceiling safely until it reaches the configured cap.
+            long long maximumDelay = std::min(base.count(), cap.count());
+            for (int growth = 0; growth &lt; attempt &amp;&amp; maximumDelay &lt; cap.count();
+                 ++growth) {
+                const long long remaining = cap.count() - maximumDelay;
+                maximumDelay += std::min(maximumDelay, remaining);
+            }
+
+            // 4) Full jitter selects any delay from zero through that ceiling.
+            std::uniform_int_distribution&lt;long long&gt; jitter(0, maximumDelay);
+            std::this_thread::sleep_for(std::chrono::milliseconds(jitter(randomEngine)));
+        }
+    }
+
+    throw std::logic_error("unreachable retry state");
+}</pre>
+            </div>
+          </div>
           <span class="complexity">Worst-case wait bounded by &Sigma; min(cap, base·2&#8319;)</span>
           <h4>Pitfalls &amp; follow-ups</h4>
           <p>Only retry <em>transient</em> errors (a 400 will fail forever; a timeout may have succeeded server-side — so the operation must be idempotent). Never retry without jitter. Follow-ups: honor an overall deadline instead of attempt count, retry budgets (retries as % of traffic), and where the circuit breaker takes over — this is the coding half of the retry-amplification postmortem in the distributed section.</p>
@@ -423,38 +1039,133 @@ def retry(fn, max_attempts=5, base=0.1, cap=10.0,
         <div class="solution">
           <h4>Approach</h4>
           <p>Hash nodes onto a circle (0..2&sup3;&sup2;); a key belongs to the first node clockwise from its own hash — a binary search over the sorted node-hash list. Each physical node gets many <em>virtual nodes</em> (replicas of its hash with different salts) so load spreads evenly and a leaving node's keys scatter to everyone, not one neighbor.</p>
-          <pre class="code">import bisect, hashlib
+          <div class="code-tabs" data-code-tabs>
+            <div class="language-tabs" role="tablist" aria-label="Consistent Hashing solution language">
+              <button class="code-tab" type="button" data-language="python">Python</button>
+              <button class="code-tab" type="button" data-language="cpp">C++</button>
+            </div>
+            <div class="code-panel" data-language-panel="python" data-label="Python solution">
+              <pre class="code">import bisect
+import hashlib
 
-def _h(s):
-    data = s if isinstance(s, bytes) else str(s).encode()
+def stable_hash(value):
+    # 1) Use a process-independent hash so every client builds the same ring.
+    data = value if isinstance(value, bytes) else str(value).encode()
     return int.from_bytes(hashlib.sha256(data).digest()[:4], "big")
 
+
 class HashRing:
-    def __init__(self, vnodes=100):
-        if vnodes &lt;= 0:
-            raise ValueError("vnodes must be positive")
-        self.vnodes = vnodes
-        self.ring = []            # sorted (hash, vnode token, physical node)
+    def __init__(self, virtual_nodes=100):
+        if virtual_nodes &lt;= 0:
+            raise ValueError("virtual_nodes must be positive")
+        self.virtual_nodes = virtual_nodes
+        self.ring = []  # Sorted (hash, token, physical-node) tuples.
         self.nodes = set()
 
     def add_node(self, node):
-        if node in self.nodes: return       # idempotent membership update
-        entries = []
-        for i in range(self.vnodes):
-            token = f"{node}#{i}"
-            entries.append((_h(token), token, node))
-        self.ring.extend(entries)
-        self.ring.sort()                    # list insertion itself is O(V)
+        # 2) Idempotent membership prevents duplicate virtual-node points.
+        if node in self.nodes:
+            return
+        for index in range(self.virtual_nodes):
+            token = f"{node}#{index}"
+            self.ring.append((stable_hash(token), token, node))
+        self.ring.sort()
         self.nodes.add(node)
 
     def remove_node(self, node):
+        # 3) Remove every virtual point owned by the physical node.
         self.ring = [entry for entry in self.ring if entry[2] != node]
         self.nodes.discard(node)
 
     def get_node(self, key):
-        if not self.ring: return None
-        i = bisect.bisect_left(self.ring, (_h(key), "", ""))
-        return self.ring[i % len(self.ring)][2]   # wrap = the "circle"</pre>
+        if not self.ring:
+            return None
+
+        # 4) Select the first point clockwise, wrapping at the end of the ring.
+        index = bisect.bisect_left(self.ring, (stable_hash(key), "", ""))
+        return self.ring[index % len(self.ring)][2]</pre>
+            </div>
+            <div class="code-panel" data-language-panel="cpp" data-label="C++ solution" hidden>
+              <pre class="code">#include &lt;algorithm&gt;
+#include &lt;cstddef&gt;
+#include &lt;cstdint&gt;
+#include &lt;optional&gt;
+#include &lt;stdexcept&gt;
+#include &lt;string&gt;
+#include &lt;string_view&gt;
+#include &lt;unordered_set&gt;
+#include &lt;vector&gt;
+
+std::uint32_t stableHash(std::string_view value) {
+    // 1) FNV-1a is deterministic across processes; production may use a stronger hash.
+    std::uint32_t hash = 2166136261u;
+    for (const unsigned char byte : value) {
+        hash ^= byte;
+        hash *= 16777619u;
+    }
+    return hash;
+}
+
+class HashRing {
+public:
+    explicit HashRing(std::size_t virtualNodes = 100)
+        : virtualNodes_(virtualNodes) {
+        if (virtualNodes_ == 0) {
+            throw std::invalid_argument("virtualNodes must be positive");
+        }
+    }
+
+    void addNode(const std::string&amp; node) {
+        // 2) Ignore repeated membership updates before adding virtual points.
+        if (!nodes_.insert(node).second) return;
+        for (std::size_t index = 0; index &lt; virtualNodes_; ++index) {
+            const std::string token = node + "#" + std::to_string(index);
+            ring_.push_back({stableHash(token), token, node});
+        }
+        std::sort(ring_.begin(), ring_.end());
+    }
+
+    void removeNode(const std::string&amp; node) {
+        // 3) Erase all virtual points that belong to the physical node.
+        ring_.erase(
+            std::remove_if(ring_.begin(), ring_.end(),
+                           [&amp;node](const Point&amp; point) { return point.node == node; }),
+            ring_.end());
+        nodes_.erase(node);
+    }
+
+    std::optional&lt;std::string&gt; getNode(std::string_view key) const {
+        if (ring_.empty()) return std::nullopt;
+
+        // 4) Binary-search the first clockwise point and wrap past the end.
+        const std::uint32_t hash = stableHash(key);
+        auto point = std::lower_bound(
+            ring_.begin(), ring_.end(), hash,
+            [](const Point&amp; entry, std::uint32_t target) {
+                return entry.hash &lt; target;
+            });
+        if (point == ring_.end()) point = ring_.begin();
+        return point-&gt;node;
+    }
+
+private:
+    struct Point {
+        std::uint32_t hash;
+        std::string token;
+        std::string node;
+
+        bool operator&lt;(const Point&amp; other) const {
+            if (hash != other.hash) return hash &lt; other.hash;
+            return token &lt; other.token;  // Deterministic tie-break for collisions.
+        }
+    };
+
+    std::size_t virtualNodes_;
+    std::vector&lt;Point&gt; ring_;
+    std::unordered_set&lt;std::string&gt; nodes_;
+};</pre>
+            </div>
+          </div>
           <span class="complexity">O(log V) lookup; O((V+R) log(V+R)) add; O(V) remove — R = vnodes added</span>
           <h4>Pitfalls &amp; follow-ups</h4>
           <p>Without virtual nodes, two physical nodes split the circle terribly unevenly, and removal dumps an entire arc on one survivor. Use a stable hash rather than Python's process-randomized <code>hash()</code>. <code>bisect_left</code> selects the first point at or clockwise from the key; the modulo wrap at the end is the ring. Follow-ups: weighted nodes (more vnodes = more traffic), how this connects to the shard-key discussion in the databases section, and bounded-load consistent hashing.</p>
@@ -477,13 +1188,66 @@ class HashRing:
   </main>
 
   <footer>
-    <p>Last updated: 2026-07-28. Book-style navigation shared across the study hub.</p>
+    <p>Last updated: 2026-07-31. Book-style navigation shared across the study hub.</p>
   </footer>
 
 <script>
 const solutionButtons = [...document.querySelectorAll(".sol-btn")];
 const solutions = [...document.querySelectorAll(".solution")];
 const allBtn = document.getElementById("toggle-all");
+
+function activateCodeTab(group, activeTab, moveFocus = false) {
+  const language = activeTab.dataset.language;
+  const tabs = [...group.querySelectorAll(".code-tab")];
+  const panels = [...group.querySelectorAll(".code-panel")];
+
+  tabs.forEach(tab => {
+    const selected = tab === activeTab;
+    tab.setAttribute("aria-selected", String(selected));
+    tab.tabIndex = selected ? 0 : -1;
+  });
+
+  panels.forEach(panel => {
+    panel.hidden = panel.dataset.languagePanel !== language;
+  });
+
+  if (moveFocus) activeTab.focus();
+}
+
+document.querySelectorAll("[data-code-tabs]").forEach((group, groupIndex) => {
+  const tabs = [...group.querySelectorAll(".code-tab")];
+  const panels = [...group.querySelectorAll(".code-panel")];
+
+  tabs.forEach((tab, tabIndex) => {
+    const language = tab.dataset.language;
+    const panel = panels.find(item => item.dataset.languagePanel === language);
+    const tabId = `code-tab-${groupIndex + 1}-${language}`;
+    const panelId = `code-panel-${groupIndex + 1}-${language}`;
+
+    tab.id = tabId;
+    tab.setAttribute("role", "tab");
+    tab.setAttribute("aria-controls", panelId);
+    panel.id = panelId;
+    panel.setAttribute("role", "tabpanel");
+    panel.setAttribute("aria-labelledby", tabId);
+
+    tab.addEventListener("click", () => activateCodeTab(group, tab));
+    tab.addEventListener("keydown", event => {
+      let nextIndex;
+      if (event.key === "ArrowRight") nextIndex = (tabIndex + 1) % tabs.length;
+      if (event.key === "ArrowLeft") nextIndex = (tabIndex - 1 + tabs.length) % tabs.length;
+      if (event.key === "Home") nextIndex = 0;
+      if (event.key === "End") nextIndex = tabs.length - 1;
+      if (nextIndex === undefined) return;
+
+      event.preventDefault();
+      activateCodeTab(group, tabs[nextIndex], true);
+    });
+  });
+
+  // Python is the initial view; C++ remains one tab away in every solution.
+  activateCodeTab(group, tabs[0]);
+});
 
 function setSolutionState(btn, solution, showing) {
   solution.classList.toggle("show", showing);
